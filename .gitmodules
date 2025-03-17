@@ -1,0 +1,3 @@
+[submodule "NetP3DLib"]
+	path = NetP3DLib
+	url = https://github.com/Hampo/NetP3DLib
