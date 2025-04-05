@@ -81,12 +81,33 @@ foreach (var staticEntity in p3dFile.GetChunksOfType<StaticEntityChunk>())
 		foreach (var oldPrimitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
 		{
 			var positionList = oldPrimitiveGroup.GetFirstChunkOfType<PositionListChunk>();
-
-			for (int i = 0; i < positionList.Positions.Count; i++)
+			
+			if (positionList != null)
 			{
-				var newPosition = Vector3.Transform(positionList.Positions[i], transform);
-				positionList.Positions[i] = newPosition;
+				for (int i = 0; i < positionList.Positions.Count; i++)
+				{
+					var newPosition = Vector3.Transform(positionList.Positions[i], transform);
+					positionList.Positions[i] = newPosition;
+				}
 			}
+		}
+		
+		var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
+		
+		if (boundingBox != null)
+		{
+			var newBBLow = Vector3.Transform(boundingBox.Low, transform);
+			boundingBox.Low = newBBLow;
+			var newBBHigh = Vector3.Transform(boundingBox.High, transform);
+			boundingBox.High = newBBHigh;
+		}
+			
+		var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
+			
+		if (boundingSphere != null)
+		{
+			var NewBSCentre = Vector3.Transform(boundingSphere.Centre, transform);
+			boundingSphere.Centre = NewBSCentre;
 		}
 	}
 }
@@ -99,13 +120,14 @@ if (!forceOverwrite && File.Exists(outputPath))
 	var response = Console.ReadLine();
 	if (response != null && response.ToLower()[0] != 'y')
 	{
+		Console.WriteLine("Error: File could not be written.");
 		Environment.Exit(4);
 	}
 }
 
 // Write output file.
 p3dFile.Write(outputPath);
-Console.WriteLine("Sucessfully wrote file!");
+Console.WriteLine("Successfully wrote file!");
 Environment.Exit(0);
 return;
 
