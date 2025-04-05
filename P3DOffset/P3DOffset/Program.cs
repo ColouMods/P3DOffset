@@ -2,12 +2,16 @@
 using NetP3DLib.P3D.Chunks;
 using System.Numerics;
 
+const float deg2Rad = MathF.PI / 180;
+
 // Initialise variables.
 var inputPath = string.Empty;
 var outputPath = string.Empty;
 var forceOverwrite = false;
 var offset = new Vector3(0, 0, 0);
-var rotation = 0f;
+var rotX = 0f;
+var rotY = 0f;
+var rotZ = 0f;
 
 // Get variable values from command line arguments.
 for (int i = 0; i < args.Length; i++)
@@ -32,8 +36,14 @@ for (int i = 0; i < args.Length; i++)
 		case "-z":
 			offset.Z = float.Parse(GetArgValue(args, i));
 			break;
-		case "-r":
-			rotation = float.Parse(GetArgValue(args, i));
+		case "-rx":
+			rotX = float.Parse(GetArgValue(args, i));
+			break;
+		case "-ry":
+			rotY = float.Parse(GetArgValue(args, i));
+			break;
+		case "-rz":
+			rotZ = float.Parse(GetArgValue(args, i));
 			break;
 	}
 }
@@ -57,6 +67,9 @@ if (File.Exists(inputPath) == false)
 	Environment.Exit(3);
 }
 
+var rotMtrx = Matrix4x4.CreateFromYawPitchRoll(rotY * deg2Rad, rotX * deg2Rad, rotZ * deg2Rad);
+var transform = rotMtrx * Matrix4x4.CreateTranslation(offset);
+
 // Create P3DFile Object
 Console.WriteLine($"Reading {inputPath}...");
 P3DFile p3dFile = new(inputPath);
@@ -71,7 +84,8 @@ foreach (var staticEntity in p3dFile.GetChunksOfType<StaticEntityChunk>())
 
 			for (int i = 0; i < positionList.Positions.Count; i++)
 			{
-				positionList.Positions[i] += offset;
+				var newPosition = Vector3.Transform(positionList.Positions[i], transform);
+				positionList.Positions[i] = newPosition;
 			}
 		}
 	}
@@ -91,6 +105,7 @@ if (!forceOverwrite && File.Exists(outputPath))
 
 // Write output file.
 p3dFile.Write(outputPath);
+Console.WriteLine("Sucessfully wrote file!");
 Environment.Exit(0);
 return;
 
