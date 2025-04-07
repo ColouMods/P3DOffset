@@ -9,11 +9,10 @@ static class Program {
 	const float deg2Rad = MathF.PI / 180;
 
 	// Initialise static variables.
-	static Vector3 offset = new Vector3(0, 0, 0);
-	static float rotX = 0f;
-	static float rotY = 0f;
-	static float rotZ = 0f;
+	static Vector3 translation = new Vector3(0, 0, 0);
+	static Vector3 rotation = new Vector3(0, 0, 0);
 	static Matrix4x4 rotMtrx;
+	static Matrix4x4 transMtrx;
 	static Matrix4x4 transform;
 
 	public static void Main(string[] args)
@@ -38,30 +37,32 @@ static class Program {
 					forceOverwrite = true;
 					break;
 				case "-x":
-					offset.X = float.Parse(GetArgValue(args, i));
+					translation.X = float.Parse(GetArgValue(args, i));
 					break;
 				case "-y":
-					offset.Y = float.Parse(GetArgValue(args, i));
+					translation.Y = float.Parse(GetArgValue(args, i));
 					break;
 				case "-z":
-					offset.Z = float.Parse(GetArgValue(args, i));
+					translation.Z = float.Parse(GetArgValue(args, i));
 					break;
 				case "-rx":
-					rotX = float.Parse(GetArgValue(args, i));
+					rotation.X = float.Parse(GetArgValue(args, i));
 					break;
 				case "-ry":
-					rotY = float.Parse(GetArgValue(args, i));
+					rotation.Y = float.Parse(GetArgValue(args, i));
 					break;
 				case "-rz":
-					rotZ = float.Parse(GetArgValue(args, i));
+					rotation.Z = float.Parse(GetArgValue(args, i));
 					break;
 			}
 		}
 		
 		// Convert input euler angles to rotation matrix.
-		rotMtrx = Matrix4x4.CreateFromYawPitchRoll(rotY * deg2Rad, rotX * deg2Rad, rotZ * deg2Rad);
-		// Combine rotation matrix and offset into transformation matrix.
-		transform = rotMtrx * Matrix4x4.CreateTranslation(offset);
+		rotMtrx = Matrix4x4.CreateFromYawPitchRoll(rotation.Y * deg2Rad, rotation.X * deg2Rad, rotation.Z * deg2Rad);
+		// Convret input translation to translation matrix.
+		transMtrx = Matrix4x4.CreateTranslation(translation);
+		// Combine rotation matrix and translation matrix into transformation matrix.
+		transform = rotMtrx * transMtrx;
 
 		// Check input and output files have been specified.
 		if (string.IsNullOrEmpty(inputPath))
@@ -91,10 +92,7 @@ static class Program {
 		// Static Entity (0x3F00000)
 		foreach (var staticEntity in p3dFile.GetChunksOfType<StaticEntityChunk>())
 		{
-			foreach (var mesh in staticEntity.GetChunksOfType<MeshChunk>())
-			{
-				OffsetMesh(mesh);
-			}
+			OffsetMeshes(staticEntity);
 		}
 		
 		// Static Phys (0x3F00001)
@@ -104,6 +102,26 @@ static class Program {
 			{
 				OffsetCollisionObject(collisionObject);
 			}
+		{
+			OffsetInstanceLists(dynaPhys);
+		}
+		
+		// Inst Stat Entity (0x3F00008)
+		foreach (var instStatEntity in p3dFile.GetChunksOfType<InstStatEntityChunk>())
+		{
+			OffsetInstanceLists(instStatEntity);
+		}
+		
+		// Inst Stat Phys (0x3F0000A)
+		foreach (var instStatPhys in p3dFile.GetChunksOfType<InstStatPhysChunk>())
+		{
+			OffsetInstanceLists(instStatPhys);
+		}
+		
+		// Anim Dyna Phys (0x3F0000E)
+		foreach (var animDynaPhys in p3dFile.GetChunksOfType<AnimDynaPhysChunk>())
+		{
+			OffsetInstanceLists(animDynaPhys);
 		}
 
 		// Check if output file already exists.
@@ -145,96 +163,124 @@ static class Program {
 
 	// Offset Chunk Methods //
 	// Mesh (0x10000)
-	static void OffsetMesh(MeshChunk mesh)
+	static void OffsetMeshes(Chunk chunk)
 	{
-		foreach (var oldPrimitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
+		foreach (var mesh in chunk.GetChunksOfType<MeshChunk>())
 		{
-			var positionList = oldPrimitiveGroup.GetFirstChunkOfType<PositionListChunk>();
-
-			if (positionList != null)
+			foreach (var oldPrimitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
 			{
-				for (int i = 0; i < positionList.Positions.Count; i++)
+				var positionList = oldPrimitiveGroup.GetFirstChunkOfType<PositionListChunk>();
+
+				if (positionList != null)
 				{
-					positionList.Positions[i] = Vector3.Transform(positionList.Positions[i], transform);
+					for (int i = 0; i < positionList.Positions.Count; i++)
+					{
+						positionList.Positions[i] = Vector3.Transform(positionList.Positions[i], transform);
+					}
 				}
 			}
-		}
 
-		var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
+			var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
 
-		if (boundingBox != null)
-		{
-			boundingBox.Low = Vector3.Transform(boundingBox.Low, transform);
-			boundingBox.High = Vector3.Transform(boundingBox.High, transform);
-		}
+			if (boundingBox != null)
+			{
+				boundingBox.Low = Vector3.Transform(boundingBox.Low, transform);
+				boundingBox.High = Vector3.Transform(boundingBox.High, transform);
+			}
 
-		var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
+			var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
 
-		if (boundingSphere != null)
-		{
-			boundingSphere.Centre = Vector3.Transform(boundingSphere.Centre, transform);
+			if (boundingSphere != null)
+			{
+				boundingSphere.Centre = Vector3.Transform(boundingSphere.Centre, transform);
+			}
 		}
 	}
 
 	// Collision Object (0x7010000)
-	static void OffsetCollisionObject(CollisionObjectChunk collisionObject)
+	static void OffsetCollisionObjects(Chunk chunk)
 	{
-		foreach (var collisionVolume in collisionObject.GetChunksOfType<CollisionVolumeChunk>())
+		foreach (var collisionObject in chunk.GetChunksOfType<CollisionObjectChunk>())
 		{
-			OffsetCollisionVolume(collisionVolume);
+			OffsetCollisionVolumes(collisionObject);
 		}
 	}
 	
 	// Collision Volume (0x7010001)
-	static void OffsetCollisionVolume(CollisionVolumeChunk collisionVolume)
+	static void OffsetCollisionVolumes(Chunk chunk)
 	{
-		foreach (var subCollisionVolume in collisionVolume.GetChunksOfType<CollisionVolumeChunk>())
+		foreach (var collisionVolume in chunk.GetChunksOfType<CollisionVolumeChunk>())
 		{
-			OffsetCollisionVolume(subCollisionVolume);
-		}
+			OffsetCollisionVolumes(collisionVolume);
 
-		foreach (var collisionBox in collisionVolume.GetChunksOfType<CollisionOrientedBoundingBoxChunk>())
-		{
-			var vectors = collisionBox.GetChunksOfType<CollisionVectorChunk>();
-			if (vectors.Length != 4) continue;
-			
-			// Construct matrix from vectors.
-			var boxRot = new Matrix4x4(vectors[1].Vector.X, vectors[1].Vector.Y, vectors[1].Vector.Z, 0,
-				vectors[2].Vector.X, vectors[2].Vector.Y, vectors[2].Vector.Z, 0,
-				vectors[3].Vector.X, vectors[3].Vector.Y, vectors[3].Vector.Z, 0,
-				vectors[0].Vector.X, vectors[0].Vector.Y, vectors[0].Vector.Z, 1);
+			foreach (var collisionBox in collisionVolume.GetChunksOfType<CollisionOrientedBoundingBoxChunk>())
+			{
+				var vectors = collisionBox.GetChunksOfType<CollisionVectorChunk>();
+				if (vectors.Length != 4) continue;
 				
-			// Apply transform to matrix.
-			var newBoxRot = boxRot * transform;
+				// Construct matrix from vectors.
+				var boxRot = new Matrix4x4(vectors[1].Vector.X, vectors[1].Vector.Y, vectors[1].Vector.Z, 0,
+					vectors[2].Vector.X, vectors[2].Vector.Y, vectors[2].Vector.Z, 0,
+					vectors[3].Vector.X, vectors[3].Vector.Y, vectors[3].Vector.Z, 0,
+					vectors[0].Vector.X, vectors[0].Vector.Y, vectors[0].Vector.Z, 1);
+					
+				// Apply transform to matrix.
+				var newBoxRot = boxRot * transform;
+					
+				// Convert matrix back to vectors.
+				vectors[0].Vector = new Vector3(newBoxRot.M41, newBoxRot.M42, newBoxRot.M43);
+				vectors[1].Vector = new Vector3(newBoxRot.M11, newBoxRot.M12, newBoxRot.M13);
+				vectors[2].Vector = new Vector3(newBoxRot.M21, newBoxRot.M22, newBoxRot.M23);
+				vectors[3].Vector = new Vector3(newBoxRot.M31, newBoxRot.M32, newBoxRot.M33);
+			}
+
+			foreach (var collisionCylinder in collisionVolume.GetChunksOfType<CollisionCylinderChunk>())
+			{
+				var vectors = collisionCylinder.GetChunksOfType<CollisionVectorChunk>();
+				if (vectors.Length != 2) continue;
 				
-			// Convert matrix back to vectors.
-			vectors[0].Vector = new Vector3(newBoxRot.M41, newBoxRot.M42, newBoxRot.M43);
-			vectors[1].Vector = new Vector3(newBoxRot.M11, newBoxRot.M12, newBoxRot.M13);
-			vectors[2].Vector = new Vector3(newBoxRot.M21, newBoxRot.M22, newBoxRot.M23);
-			vectors[3].Vector = new Vector3(newBoxRot.M31, newBoxRot.M32, newBoxRot.M33);
+				// Apply transform to centre vector.
+				vectors[0].Vector = Vector3.Transform(vectors[0].Vector, transform);
+
+				// Apply transform to direction vector.
+					// Collision Cylinders don't store the entire rotation matrix, they store only the centre column as a vector.
+					// If you multiply the transform matrix by the direction vector (rather than multiplying the vector by the
+					// matrix, as you normally would), you get a new vector that equals the original rotated by the transform matrix.
+					// I don't understand why this works, but it does so...hooray!
+				vectors[1].Vector = MultMatrixByVector(transform, vectors[1].Vector);
+			}
+
+			foreach (var collisionSphere in collisionVolume.GetChunksOfType<CollisionSphereChunk>())
+			{
+				var vectorCentre = collisionSphere.GetFirstChunkOfType<CollisionVectorChunk>();
+				if (vectorCentre == null) continue;
+				
+				vectorCentre.Vector = Vector3.Transform(vectorCentre.Vector, transform);
+			}
 		}
-
-		foreach (var collisionCylinder in collisionVolume.GetChunksOfType<CollisionCylinderChunk>())
+	}
+	
+	// Instance List (0x30000008)
+	static void OffsetInstanceLists(Chunk chunk)
+	{
+		foreach (var instanceList in chunk.GetChunksOfType<InstanceListChunk>())
 		{
-			var vectors = collisionCylinder.GetChunksOfType<CollisionVectorChunk>();
-			if (vectors.Length != 2) continue;
-			
-			// Apply transform to centre vector.
-			vectors[0].Vector = Vector3.Transform(vectors[0].Vector, transform);
-
-			// Apply transform to direction vector.
-				// Collision Cylinders don't store the entire rotation matrix, they store only the centre column as a vector.
-				// If you multiply the transform matrix by the direction vector (rather than multiplying the vector by the
-				// matrix, as you normally would), you get a new vector that equals the original rotated by the transform matrix.
-				// I don't understand why this works, but it does so...hooray!
-			vectors[1].Vector = MultMatrixByVector(transform, vectors[1].Vector);
-		}
-
-		foreach (var collisionSphere in collisionVolume.GetChunksOfType<CollisionSphereChunk>())
-		{
-			var vectorCentre = collisionSphere.GetFirstChunkOfType<CollisionVectorChunk>();
-			if (vectorCentre == null) continue;
-			vectorCentre.Vector = Vector3.Transform(vectorCentre.Vector, transform);
+			foreach (var scenegraph in instanceList.GetChunksOfType<ScenegraphChunk>())
+			{
+				foreach (var scenegraphRoot in scenegraph.GetChunksOfType<OldScenegraphRootChunk>())
+				{
+					foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
+					{
+						foreach (var scenegraphTransform in scenegraphBranch.GetChunksOfType<OldScenegraphTransformChunk>())
+						{
+							foreach (var subScenegraphTransform in scenegraphTransform.GetChunksOfType<OldScenegraphTransformChunk>())
+							{
+								subScenegraphTransform.Transform *= transform;
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 }
