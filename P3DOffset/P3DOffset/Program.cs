@@ -58,8 +58,10 @@ static class Program {
 		}
 		
 		// Convert input euler angles to rotation matrix.
-		rotMtrx = Matrix4x4.CreateFromYawPitchRoll(rotation.Y * deg2Rad, rotation.X * deg2Rad, rotation.Z * deg2Rad);
-		// Convret input translation to translation matrix.
+		rotMtrx = GetRotationMatrix(rotation.X * deg2Rad, rotation.Y * deg2Rad, rotation.Z * deg2Rad);
+		
+		Console.WriteLine(rotMtrx);
+		// Convert input translation to translation matrix.
 		transMtrx = Matrix4x4.CreateTranslation(translation);
 		// Combine rotation matrix and translation matrix into transformation matrix.
 		transform = rotMtrx * transMtrx;
@@ -154,12 +156,31 @@ static class Program {
 		}
 		return args[i + 1];
 	}
-
-	static Vector3 MultMatrixByVector(Matrix4x4 matrix, Vector3 vector)
+	
+	static Matrix4x4 GetRotationMatrix(float x, float y, float z)
 	{
-		return new Vector3(matrix.M11 * vector.X + matrix.M21 * vector.Y + matrix.M31 * vector.Z,
-			matrix.M12 * vector.X + matrix.M22 * vector.Y + matrix.M32 * vector.Z,
-			matrix.M13 * vector.X + matrix.M23 * vector.Y + matrix.M33 * vector.Z);
+		var xMtrx = new Matrix4x4(
+			1f, 0f, 0f, 0f,
+			0f, MathF.Cos(x), -MathF.Sin(x), 0f,
+			0f, MathF.Sin(x), MathF.Cos(x), 0f,
+			0f, 0f, 0f, 1f
+		);
+		
+		var yMtrx = new Matrix4x4(
+			MathF.Cos(y), 0f, MathF.Sin(y), 0f,
+			0f, 1f, 0f, 0f,
+			-MathF.Sin(y), 0, MathF.Cos(y), 0f,
+			0f, 0f, 0f, 1f
+		);
+
+		var zMtrx = new Matrix4x4(
+			MathF.Cos(z), -MathF.Sin(z), 0f, 0f,
+			MathF.Sin(z), MathF.Cos(z), 0f, 0f,
+			0f, 0f, 1f, 0f,
+			0f, 0f, 0f, 1f
+		);
+		
+		return xMtrx * yMtrx * zMtrx;
 	}
 
 	// Offset Chunk Methods //
@@ -244,11 +265,15 @@ static class Program {
 				vectors[0].Vector = Vector3.Transform(vectors[0].Vector, transform);
 
 				// Apply transform to direction vector.
-					// Collision Cylinders don't store the entire rotation matrix, they store only the centre column as a vector.
-					// If you multiply the transform matrix by the direction vector (rather than multiplying the vector by the
-					// matrix, as you normally would), you get a new vector that equals the original rotated by the transform matrix.
-					// I don't understand why this works, but it does so...hooray!
-				vectors[1].Vector = MultMatrixByVector(transform, vectors[1].Vector);
+				var rot = vectors[1].Vector;
+				// Collision Cylinders don't store the entire rotation matrix, they store only the centre column as a vector.
+				// As such, applying the transform isn't as simple as multiplying matrices.
+				// But, by complete accident, I stumbled upon a formula that seems to work? (though I don't understand why)
+				vectors[1].Vector = new Vector3(
+					transform.M11 * rot.X + transform.M21 * rot.Y + transform.M31 * rot.Z,
+					transform.M12 * rot.X + transform.M22 * rot.Y + transform.M32 * rot.Z,
+					transform.M13 * rot.X + transform.M23 * rot.Y + transform.M33 * rot.Z
+				);
 			}
 
 			foreach (var collisionSphere in collisionVolume.GetChunksOfType<CollisionSphereChunk>())
