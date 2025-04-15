@@ -98,10 +98,11 @@ static class Program {
 		// Static Phys (0x3F00001)
 		foreach (var staticPhys in p3dFile.GetChunksOfType<StaticPhysChunk>())
 		{
-			foreach (var collisionObject in staticPhys.GetChunksOfType<CollisionObjectChunk>())
-			{
-				OffsetCollisionObject(collisionObject);
-			}
+			OffsetCollisionObjects(staticPhys);
+		}
+
+		// Dyna Phys (0x3F00002)
+		foreach (var dynaPhys in p3dFile.GetChunksOfType<DynaPhysChunk>())
 		{
 			OffsetInstanceLists(dynaPhys);
 		}
