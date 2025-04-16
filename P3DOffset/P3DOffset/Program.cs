@@ -95,24 +95,69 @@ static class Program {
 
 			switch (type)
 			{
+				// Static Entity (0x3F00000)
 				case var t when t == typeof(StaticEntityChunk):
-					// Static Entity (0x3F00000)
-					OffsetMeshes(chunk);
+					foreach (var mesh in chunk.GetChunksOfType<MeshChunk>())
+					{
+						foreach (var oldPrimitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
+						{
+							var positionList = oldPrimitiveGroup.GetFirstChunkOfType<PositionListChunk>();
+
+							if (positionList != null)
+							{
+								for (int i = 0; i < positionList.Positions.Count; i++)
+								{
+									positionList.Positions[i] = Vector3.Transform(positionList.Positions[i], transform);
+								}
+							}
+						}
+
+						var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
+
+						if (boundingBox != null)
+						{
+							boundingBox.Low = Vector3.Transform(boundingBox.Low, transform);
+							boundingBox.High = Vector3.Transform(boundingBox.High, transform);
+						}
+
+						var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
+
+						if (boundingSphere != null)
+						{
+							boundingSphere.Centre = Vector3.Transform(boundingSphere.Centre, transform);
+						}
+					}
 					break;
 
+				// Static Phys (0x3F00001)
 				case var t when t == typeof(StaticPhysChunk):
-					// Static Phys (0x3F00001)
-					OffsetCollisionObjects(chunk);
+					foreach (var collisionObject in chunk.GetChunksOfType<CollisionObjectChunk>())
+					{
+						OffsetCollisionVolumes(collisionObject);
+					}
 					break;
 
-				case var t when t == typeof(DynaPhysChunk):
-					// Dyna Phys (0x3F00002)
-					OffsetInstanceLists(chunk);
-					break;
-
-				case var t when t == typeof(InstStatEntityChunk) || t == typeof(InstStatPhysChunk) || t == typeof(AnimDynaPhysChunk):
-					// Inst Stat Entity (0x3F00008), Inst Stat Phys (0x3F0000A), & // Anim Dyna Phys (0x3F0000E)
-					OffsetInstanceLists(chunk);
+				// Dyna Phys (0x3F00002), Inst Stat Entity (0x3F00008), Inst Stat Phys (0x3F0000A), & Anim Dyna Phys (0x3F0000E)
+				case var t when t == typeof(DynaPhysChunk) || t == typeof(InstStatEntityChunk) || t == typeof(InstStatPhysChunk) || t == typeof(AnimDynaPhysChunk):
+					foreach (var instanceList in chunk.GetChunksOfType<InstanceListChunk>())
+					{
+						foreach (var scenegraph in instanceList.GetChunksOfType<ScenegraphChunk>())
+						{
+							foreach (var scenegraphRoot in scenegraph.GetChunksOfType<OldScenegraphRootChunk>())
+							{
+								foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
+								{
+									foreach (var scenegraphTransform in scenegraphBranch.GetChunksOfType<OldScenegraphTransformChunk>())
+									{
+										foreach (var subScenegraphTransform in scenegraphTransform.GetChunksOfType<OldScenegraphTransformChunk>())
+										{
+											subScenegraphTransform.Transform *= transform;
+										}
+									}
+								}
+							}
+						}
+					}
 					break;
 			}
 		}
@@ -174,50 +219,6 @@ static class Program {
 	}
 
 	// Offset Chunk Methods //
-	// Mesh (0x10000)
-	static void OffsetMeshes(Chunk chunk)
-	{
-		foreach (var mesh in chunk.GetChunksOfType<MeshChunk>())
-		{
-			foreach (var oldPrimitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
-			{
-				var positionList = oldPrimitiveGroup.GetFirstChunkOfType<PositionListChunk>();
-
-				if (positionList != null)
-				{
-					for (int i = 0; i < positionList.Positions.Count; i++)
-					{
-						positionList.Positions[i] = Vector3.Transform(positionList.Positions[i], transform);
-					}
-				}
-			}
-
-			var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
-
-			if (boundingBox != null)
-			{
-				boundingBox.Low = Vector3.Transform(boundingBox.Low, transform);
-				boundingBox.High = Vector3.Transform(boundingBox.High, transform);
-			}
-
-			var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
-
-			if (boundingSphere != null)
-			{
-				boundingSphere.Centre = Vector3.Transform(boundingSphere.Centre, transform);
-			}
-		}
-	}
-
-	// Collision Object (0x7010000)
-	static void OffsetCollisionObjects(Chunk chunk)
-	{
-		foreach (var collisionObject in chunk.GetChunksOfType<CollisionObjectChunk>())
-		{
-			OffsetCollisionVolumes(collisionObject);
-		}
-	}
-	
 	// Collision Volume (0x7010001)
 	static void OffsetCollisionVolumes(Chunk chunk)
 	{
@@ -272,30 +273,6 @@ static class Program {
 				if (vectorCentre == null) continue;
 				
 				vectorCentre.Vector = Vector3.Transform(vectorCentre.Vector, transform);
-			}
-		}
-	}
-	
-	// Instance List (0x30000008)
-	static void OffsetInstanceLists(Chunk chunk)
-	{
-		foreach (var instanceList in chunk.GetChunksOfType<InstanceListChunk>())
-		{
-			foreach (var scenegraph in instanceList.GetChunksOfType<ScenegraphChunk>())
-			{
-				foreach (var scenegraphRoot in scenegraph.GetChunksOfType<OldScenegraphRootChunk>())
-				{
-					foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
-					{
-						foreach (var scenegraphTransform in scenegraphBranch.GetChunksOfType<OldScenegraphTransformChunk>())
-						{
-							foreach (var subScenegraphTransform in scenegraphTransform.GetChunksOfType<OldScenegraphTransformChunk>())
-							{
-								subScenegraphTransform.Transform *= transform;
-							}
-						}
-					}
-				}
 			}
 		}
 	}
