@@ -59,8 +59,6 @@ static class Program {
 		
 		// Convert input euler angles to rotation matrix.
 		rotMtrx = GetRotationMatrix(rotation.X * deg2Rad, rotation.Y * deg2Rad, rotation.Z * deg2Rad);
-		
-		Console.WriteLine(rotMtrx);
 		// Convert input translation to translation matrix.
 		transMtrx = Matrix4x4.CreateTranslation(translation);
 		// Combine rotation matrix and translation matrix into transformation matrix.
@@ -90,41 +88,33 @@ static class Program {
 		Console.WriteLine($"Reading {inputPath}...");
 		P3DFile p3dFile = new(inputPath);
 
-		// Offset Chunks //
-		// Static Entity (0x3F00000)
-		foreach (var staticEntity in p3dFile.GetChunksOfType<StaticEntityChunk>())
+		// Offset Chunks
+		foreach (var chunk in p3dFile.Chunks)
 		{
-			OffsetMeshes(staticEntity);
-		}
-		
-		// Static Phys (0x3F00001)
-		foreach (var staticPhys in p3dFile.GetChunksOfType<StaticPhysChunk>())
-		{
-			OffsetCollisionObjects(staticPhys);
-		}
+			var type = chunk.GetType();
 
-		// Dyna Phys (0x3F00002)
-		foreach (var dynaPhys in p3dFile.GetChunksOfType<DynaPhysChunk>())
-		{
-			OffsetInstanceLists(dynaPhys);
-		}
-		
-		// Inst Stat Entity (0x3F00008)
-		foreach (var instStatEntity in p3dFile.GetChunksOfType<InstStatEntityChunk>())
-		{
-			OffsetInstanceLists(instStatEntity);
-		}
-		
-		// Inst Stat Phys (0x3F0000A)
-		foreach (var instStatPhys in p3dFile.GetChunksOfType<InstStatPhysChunk>())
-		{
-			OffsetInstanceLists(instStatPhys);
-		}
-		
-		// Anim Dyna Phys (0x3F0000E)
-		foreach (var animDynaPhys in p3dFile.GetChunksOfType<AnimDynaPhysChunk>())
-		{
-			OffsetInstanceLists(animDynaPhys);
+			switch (type)
+			{
+				case var t when t == typeof(StaticEntityChunk):
+					// Static Entity (0x3F00000)
+					OffsetMeshes(chunk);
+					break;
+
+				case var t when t == typeof(StaticPhysChunk):
+					// Static Phys (0x3F00001)
+					OffsetCollisionObjects(chunk);
+					break;
+
+				case var t when t == typeof(DynaPhysChunk):
+					// Dyna Phys (0x3F00002)
+					OffsetInstanceLists(chunk);
+					break;
+
+				case var t when t == typeof(InstStatEntityChunk) || t == typeof(InstStatPhysChunk) || t == typeof(AnimDynaPhysChunk):
+					// Inst Stat Entity (0x3F00008), Inst Stat Phys (0x3F0000A), & // Anim Dyna Phys (0x3F0000E)
+					OffsetInstanceLists(chunk);
+					break;
+			}
 		}
 
 		// Check if output file already exists.
