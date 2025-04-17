@@ -99,32 +99,69 @@ static class Program {
 				case var t when t == typeof(StaticEntityChunk):
 					foreach (var mesh in chunk.GetChunksOfType<MeshChunk>())
 					{
-						foreach (var oldPrimitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
+						float? lowX = null, lowY = null, lowZ = null;
+						float? highX = null, highY = null, highZ = null;
+						
+						foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
 						{
-							var positionList = oldPrimitiveGroup.GetFirstChunkOfType<PositionListChunk>();
-
-							if (positionList != null)
+							var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
+							if (positionList == null) continue;
+							
+							for (int i = 0; i < positionList.Positions.Count; i++)
 							{
-								for (int i = 0; i < positionList.Positions.Count; i++)
-								{
-									positionList.Positions[i] = Vector3.Transform(positionList.Positions[i], transform);
-								}
+								// Apply transform to each vertex position.
+								var pos = positionList.Positions[i];
+								var newPos = Vector3.Transform(pos, transform);
+								positionList.Positions[i] = newPos;
+
+								// Find min and max X, Y and Z values.
+								lowX = Math.Min(lowX ?? newPos.X, newPos.X); // If lowX is null, newPos.X is substituted in instead.
+								lowY = Math.Min(lowY ?? newPos.Y, newPos.Y);
+								lowZ = Math.Min(lowZ ?? newPos.Z, newPos.Z);
+
+								highX = Math.Max(highX ?? newPos.X, newPos.X);
+								highY = Math.Max(highY ?? newPos.Y, newPos.Y);
+								highZ = Math.Max(highZ ?? newPos.Z, newPos.Z);
 							}
 						}
+						
+						// Set Bounding Box values.
+						var bbLow = new Vector3(lowX ?? 0, lowY ?? 0, lowZ ?? 0);
+						var bbHigh = new Vector3(highX ?? 0, highY ?? 0, highZ ?? 0);
 
 						var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
 
 						if (boundingBox != null)
 						{
-							boundingBox.Low = Vector3.Transform(boundingBox.Low, transform);
-							boundingBox.High = Vector3.Transform(boundingBox.High, transform);
+							boundingBox.Low = bbLow;
+							boundingBox.High = bbHigh;
 						}
 
+						// Set Bounding Sphere values.
 						var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
 
 						if (boundingSphere != null)
 						{
-							boundingSphere.Centre = Vector3.Transform(boundingSphere.Centre, transform);
+							boundingSphere.Centre = new Vector3(
+								(bbLow.X + bbHigh.X) / 2,
+								(bbLow.Y + bbHigh.Y) / 2,
+								(bbLow.Z + bbHigh.Z) / 2);
+							
+							// Find furthest away vertex from the bounding sphere centre.
+							float? maxDist = null;
+							foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
+							{
+								var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
+								if (positionList == null) continue;
+
+								foreach (var position in positionList.Positions)
+								{
+									var dist = Vector3.Distance(position, boundingSphere.Centre);
+									maxDist = Math.Max(maxDist ?? dist, dist);
+								}
+							}
+							
+							boundingSphere.Radius = maxDist ?? 0;
 						}
 					}
 					break;
