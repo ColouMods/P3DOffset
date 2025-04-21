@@ -200,6 +200,68 @@ static class Program {
 						}
 					}
 					break;
+				
+				// Anim Coll (0x3F00008) & Anim (0x3F0000C)
+				case var t when t == typeof(AnimCollChunk) || t == typeof(AnimChunk):
+					var drawable = chunk.GetFirstChunkOfType<CompositeDrawableChunk>();
+					if (drawable == null) break;
+					
+					// Find skeleton referenced by the Composite Drawable.
+					var skeletonName = drawable.SkeletonName;
+					
+					var skeleton = p3dFile.GetFirstChunkOfType<SkeletonChunk>(skeletonName);
+					if (skeleton == null) break;
+					
+					// Find root joint of the skeleton.
+					var rootJoint = skeleton.GetFirstChunkOfType<SkeletonJointChunk>();
+					if (rootJoint == null) break;
+					
+					// Apply transform to root joint.
+					rootJoint.RestPose *= transform;
+
+					var controller = chunk.GetFirstChunkOfType<MultiControllerChunk>();
+					
+					if (controller == null) break;
+					// Find animations referenced by the Multi Controller
+					var controllerTrack = controller.GetFirstChunkOfType<MultiControllerTracksChunk>();
+					if (controllerTrack == null) continue;
+					
+					var tracks = controllerTrack.Tracks;
+
+					foreach (var track in tracks)
+					{
+						var animationName = track.Name;
+
+						var animation = p3dFile.GetFirstChunkOfType<AnimationChunk>(animationName);
+						if (animation == null) continue;
+						
+						foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
+						{
+							var rootGroup = groupList.GetFirstChunkOfType<AnimationGroupChunk>(rootJoint.Name);
+							if (rootGroup == null) continue;
+							
+							foreach (var vectors in rootGroup.GetChunksOfType<Vector3DOFChannelChunk>())
+							{
+								if (vectors.Param != "TRAN") continue;
+								
+								for (int i = 0; i < vectors.Values.Count; i++)
+								{
+									vectors.Values[i] = Vector3.Transform(vectors.Values[i], transform);
+								}
+							}
+
+							foreach (var quaternions in rootGroup.GetChunksOfType<QuaternionChannelChunk>())
+							{
+								if (quaternions.Param != "ROT") continue;
+								
+								for (int i = 0; i < quaternions.Values.Count; i++)
+								{
+									quaternions.Values[i] *= rotQuat;
+								}
+							}
+						}
+					}
+					break;
 			}
 		}
 
