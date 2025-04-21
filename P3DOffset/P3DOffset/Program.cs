@@ -11,9 +11,8 @@ static class Program {
 	// Initialise static variables.
 	static Vector3 translation = new Vector3(0, 0, 0);
 	static Vector3 rotation = new Vector3(0, 0, 0);
-	static Matrix4x4 rotMtrx;
-	static Matrix4x4 transMtrx;
 	static Matrix4x4 transform;
+	static Quaternion rotQuat;
 
 	public static void Main(string[] args)
 	{
@@ -58,9 +57,14 @@ static class Program {
 		}
 		
 		// Convert input euler angles to rotation matrix.
-		rotMtrx = GetRotationMatrix(rotation.X * deg2Rad, rotation.Y * deg2Rad, rotation.Z * deg2Rad);
+		var rotMtrx = GetRotationMatrix(rotation.X * deg2Rad, rotation.Y * deg2Rad, rotation.Z * deg2Rad);
+		
+		// Convert rotation matrix to quaternion.
+		rotQuat = Quaternion.CreateFromRotationMatrix(rotMtrx);
+		
 		// Convert input translation to translation matrix.
-		transMtrx = Matrix4x4.CreateTranslation(translation);
+		var transMtrx = Matrix4x4.CreateTranslation(translation);
+		
 		// Combine rotation matrix and translation matrix into transformation matrix.
 		transform = rotMtrx * transMtrx;
 
@@ -233,26 +237,26 @@ static class Program {
 	{
 		var xMtrx = new Matrix4x4(
 			1f, 0f, 0f, 0f,
-			0f, MathF.Cos(x), -MathF.Sin(x), 0f,
-			0f, MathF.Sin(x), MathF.Cos(x), 0f,
+			0f, MathF.Cos(x), MathF.Sin(x), 0f,
+			0f, -MathF.Sin(x), MathF.Cos(x), 0f,
 			0f, 0f, 0f, 1f
 		);
-		
+    
 		var yMtrx = new Matrix4x4(
-			MathF.Cos(y), 0f, MathF.Sin(y), 0f,
+			MathF.Cos(y), 0f, -MathF.Sin(y), 0f,
 			0f, 1f, 0f, 0f,
-			-MathF.Sin(y), 0, MathF.Cos(y), 0f,
+			MathF.Sin(y), 0f, MathF.Cos(y), 0f,
 			0f, 0f, 0f, 1f
 		);
-
+    
 		var zMtrx = new Matrix4x4(
-			MathF.Cos(z), -MathF.Sin(z), 0f, 0f,
-			MathF.Sin(z), MathF.Cos(z), 0f, 0f,
+			MathF.Cos(z), MathF.Sin(z), 0f, 0f,
+			-MathF.Sin(z), MathF.Cos(z), 0f, 0f,
 			0f, 0f, 1f, 0f,
 			0f, 0f, 0f, 1f
 		);
 		
-		return xMtrx * yMtrx * zMtrx;
+		return zMtrx * yMtrx * xMtrx;
 	}
 
 	// Offset Chunk Methods //
