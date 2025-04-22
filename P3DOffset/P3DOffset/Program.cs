@@ -95,177 +95,185 @@ static class Program {
 		// Offset Chunks
 		foreach (var chunk in p3dFile.Chunks)
 		{
-			var type = chunk.GetType();
-
-			switch (type)
+			// Static Entity (0x3F00000)
+			if (chunk is StaticEntityChunk)
 			{
-				// Static Entity (0x3F00000)
-				case var t when t == typeof(StaticEntityChunk):
-					foreach (var mesh in chunk.GetChunksOfType<MeshChunk>())
+				foreach (var mesh in chunk.GetChunksOfType<MeshChunk>())
+				{
+					float? lowX = null, lowY = null, lowZ = null;
+					float? highX = null, highY = null, highZ = null;
+
+					foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
 					{
-						float? lowX = null, lowY = null, lowZ = null;
-						float? highX = null, highY = null, highZ = null;
-						
+						var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
+						if (positionList == null) continue;
+
+						for (int i = 0; i < positionList.Positions.Count; i++)
+						{
+							// Apply transform to each vertex position.
+							var pos = positionList.Positions[i];
+							var newPos = Vector3.Transform(pos, transform);
+							positionList.Positions[i] = newPos;
+
+							// Find min and max X, Y and Z values.
+							lowX = Math.Min(lowX ?? newPos.X,
+								newPos.X); // If lowX is null, newPos.X is substituted in instead.
+							lowY = Math.Min(lowY ?? newPos.Y, newPos.Y);
+							lowZ = Math.Min(lowZ ?? newPos.Z, newPos.Z);
+
+							highX = Math.Max(highX ?? newPos.X, newPos.X);
+							highY = Math.Max(highY ?? newPos.Y, newPos.Y);
+							highZ = Math.Max(highZ ?? newPos.Z, newPos.Z);
+						}
+					}
+
+					// Set Bounding Box values.
+					var bbLow = new Vector3(lowX ?? 0, lowY ?? 0, lowZ ?? 0);
+					var bbHigh = new Vector3(highX ?? 0, highY ?? 0, highZ ?? 0);
+
+					var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
+
+					if (boundingBox != null)
+					{
+						boundingBox.Low = bbLow;
+						boundingBox.High = bbHigh;
+					}
+
+					// Set Bounding Sphere values.
+					var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
+
+					if (boundingSphere != null)
+					{
+						boundingSphere.Centre = new Vector3(
+							(bbLow.X + bbHigh.X) / 2,
+							(bbLow.Y + bbHigh.Y) / 2,
+							(bbLow.Z + bbHigh.Z) / 2);
+
+						// Find furthest away vertex from the bounding sphere centre.
+						float? maxDist = null;
 						foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
 						{
 							var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
 							if (positionList == null) continue;
-							
-							for (int i = 0; i < positionList.Positions.Count; i++)
+
+							foreach (var position in positionList.Positions)
 							{
-								// Apply transform to each vertex position.
-								var pos = positionList.Positions[i];
-								var newPos = Vector3.Transform(pos, transform);
-								positionList.Positions[i] = newPos;
-
-								// Find min and max X, Y and Z values.
-								lowX = Math.Min(lowX ?? newPos.X, newPos.X); // If lowX is null, newPos.X is substituted in instead.
-								lowY = Math.Min(lowY ?? newPos.Y, newPos.Y);
-								lowZ = Math.Min(lowZ ?? newPos.Z, newPos.Z);
-
-								highX = Math.Max(highX ?? newPos.X, newPos.X);
-								highY = Math.Max(highY ?? newPos.Y, newPos.Y);
-								highZ = Math.Max(highZ ?? newPos.Z, newPos.Z);
+								var dist = Vector3.Distance(position, boundingSphere.Centre);
+								maxDist = Math.Max(maxDist ?? dist, dist);
 							}
 						}
-						
-						// Set Bounding Box values.
-						var bbLow = new Vector3(lowX ?? 0, lowY ?? 0, lowZ ?? 0);
-						var bbHigh = new Vector3(highX ?? 0, highY ?? 0, highZ ?? 0);
 
-						var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
-
-						if (boundingBox != null)
-						{
-							boundingBox.Low = bbLow;
-							boundingBox.High = bbHigh;
-						}
-
-						// Set Bounding Sphere values.
-						var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
-
-						if (boundingSphere != null)
-						{
-							boundingSphere.Centre = new Vector3(
-								(bbLow.X + bbHigh.X) / 2,
-								(bbLow.Y + bbHigh.Y) / 2,
-								(bbLow.Z + bbHigh.Z) / 2);
-							
-							// Find furthest away vertex from the bounding sphere centre.
-							float? maxDist = null;
-							foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
-							{
-								var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
-								if (positionList == null) continue;
-
-								foreach (var position in positionList.Positions)
-								{
-									var dist = Vector3.Distance(position, boundingSphere.Centre);
-									maxDist = Math.Max(maxDist ?? dist, dist);
-								}
-							}
-							
-							boundingSphere.Radius = maxDist ?? 0;
-						}
+						boundingSphere.Radius = maxDist ?? 0;
 					}
-					break;
+				}
 
-				// Static Phys (0x3F00001)
-				case var t when t == typeof(StaticPhysChunk):
-					foreach (var collisionObject in chunk.GetChunksOfType<CollisionObjectChunk>())
-					{
-						OffsetCollisionVolumes(collisionObject);
-					}
-					break;
+				continue;
+			}
 
-				// Dyna Phys (0x3F00002), Inst Stat Entity (0x3F00008), Inst Stat Phys (0x3F0000A), & Anim Dyna Phys (0x3F0000E)
-				case var t when t == typeof(DynaPhysChunk) || t == typeof(InstStatEntityChunk) || t == typeof(InstStatPhysChunk) || t == typeof(AnimDynaPhysChunk):
-					foreach (var instanceList in chunk.GetChunksOfType<InstanceListChunk>())
+			// Static Phys (0x3F00001)
+			if (chunk is StaticPhysChunk)
+			{
+				foreach (var collisionObject in chunk.GetChunksOfType<CollisionObjectChunk>())
+				{
+					OffsetCollisionVolumes(collisionObject);
+				}
+
+				continue;
+			}
+
+			// Dyna Phys (0x3F00002), Inst Stat Entity (0x3F00008), Inst Stat Phys (0x3F0000A), & Anim Dyna Phys (0x3F0000E)
+			if (chunk is DynaPhysChunk or InstStatEntityChunk or InstStatPhysChunk or AnimDynaPhysChunk)
+			{
+				foreach (var instanceList in chunk.GetChunksOfType<InstanceListChunk>())
+				{
+					foreach (var scenegraph in instanceList.GetChunksOfType<ScenegraphChunk>())
 					{
-						foreach (var scenegraph in instanceList.GetChunksOfType<ScenegraphChunk>())
+						foreach (var scenegraphRoot in scenegraph.GetChunksOfType<OldScenegraphRootChunk>())
 						{
-							foreach (var scenegraphRoot in scenegraph.GetChunksOfType<OldScenegraphRootChunk>())
+							foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
 							{
-								foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
+								foreach (var scenegraphTransform in scenegraphBranch.GetChunksOfType<OldScenegraphTransformChunk>())
 								{
-									foreach (var scenegraphTransform in scenegraphBranch.GetChunksOfType<OldScenegraphTransformChunk>())
+									foreach (var subScenegraphTransform in scenegraphTransform.GetChunksOfType<OldScenegraphTransformChunk>())
 									{
-										foreach (var subScenegraphTransform in scenegraphTransform.GetChunksOfType<OldScenegraphTransformChunk>())
-										{
-											subScenegraphTransform.Transform *= transform;
-										}
+										subScenegraphTransform.Transform *= transform;
 									}
 								}
 							}
 						}
 					}
-					break;
-				
-				// Anim Coll (0x3F00008) & Anim (0x3F0000C)
-				case var t when t == typeof(AnimCollChunk) || t == typeof(AnimChunk):
-					var drawable = chunk.GetFirstChunkOfType<CompositeDrawableChunk>();
-					if (drawable == null) break;
-					
-					// Find skeleton referenced by the Composite Drawable.
-					var skeletonName = drawable.SkeletonName;
-					
-					var skeleton = p3dFile.GetFirstChunkOfType<SkeletonChunk>(skeletonName);
-					if (skeleton == null) break;
-					
-					// Find root joint of the skeleton.
-					var rootJoint = skeleton.GetFirstChunkOfType<SkeletonJointChunk>();
-					if (rootJoint == null) break;
-					
-					// Apply transform to root joint.
-					rootJoint.RestPose *= transform;
+				}
 
-					var controller = chunk.GetFirstChunkOfType<MultiControllerChunk>();
-					
-					if (controller == null) break;
-					// Find animation names referenced by the Multi Controller
-					var controllerTrack = controller.GetFirstChunkOfType<MultiControllerTracksChunk>();
-					if (controllerTrack == null) continue;
-					
-					var tracks = controllerTrack.Tracks;
+				continue;
+			}
+			
+			// Anim Coll (0x3F00008) & Anim (0x3F0000C)
+			if (chunk is AnimCollChunk or AnimChunk)
+			{
+				var drawable = chunk.GetFirstChunkOfType<CompositeDrawableChunk>();
+				if (drawable == null) break;
 
-					foreach (var track in tracks)
+				// Find skeleton referenced by the Composite Drawable.
+				var skeletonName = drawable.SkeletonName;
+
+				var skeleton = p3dFile.GetFirstChunkOfType<SkeletonChunk>(skeletonName);
+				if (skeleton == null) break;
+
+				// Find root joint of the skeleton.
+				var rootJoint = skeleton.GetFirstChunkOfType<SkeletonJointChunk>();
+				if (rootJoint == null) break;
+
+				// Apply transform to root joint.
+				rootJoint.RestPose *= transform;
+
+				var controller = chunk.GetFirstChunkOfType<MultiControllerChunk>();
+
+				if (controller == null) break;
+				// Find animation names referenced by the Multi Controller
+				var controllerTrack = controller.GetFirstChunkOfType<MultiControllerTracksChunk>();
+				if (controllerTrack == null) continue;
+
+				var tracks = controllerTrack.Tracks;
+
+				foreach (var track in tracks)
+				{
+					var animationName = track.Name;
+
+					// Find animation chunk that matches the referenced name.
+					var animation = p3dFile.GetFirstChunkOfType<AnimationChunk>(animationName);
+					if (animation == null) continue;
+
+					foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
 					{
-						var animationName = track.Name;
+						// Find animation group that corresponds to the skeleton root chunk.
+						var rootGroup = groupList.GetFirstChunkOfType<AnimationGroupChunk>(rootJoint.Name);
+						if (rootGroup == null) continue;
 
-						// Find animation chunk that matches the referenced name.
-						var animation = p3dFile.GetFirstChunkOfType<AnimationChunk>(animationName);
-						if (animation == null) continue;
-						
-						foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
+						// Find TRAN channels and apply transform.
+						foreach (var vectors in rootGroup.GetChunksOfType<Vector3DOFChannelChunk>())
 						{
-							// Find animation group that corresponds to the skeleton root chunk.
-							var rootGroup = groupList.GetFirstChunkOfType<AnimationGroupChunk>(rootJoint.Name);
-							if (rootGroup == null) continue;
-							
-							// Find TRAN channels and apply transform.
-							foreach (var vectors in rootGroup.GetChunksOfType<Vector3DOFChannelChunk>())
-							{
-								if (vectors.Param != "TRAN") continue;
-								
-								for (int i = 0; i < vectors.Values.Count; i++)
-								{
-									vectors.Values[i] = Vector3.Transform(vectors.Values[i], transform);
-								}
-							}
+							if (vectors.Param != "TRAN") continue;
 
-							// Find ROT channels and apply rotation.
-							foreach (var quaternions in rootGroup.GetChunksOfType<QuaternionChannelChunk>())
+							for (int i = 0; i < vectors.Values.Count; i++)
 							{
-								if (quaternions.Param != "ROT") continue;
-								
-								for (int i = 0; i < quaternions.Values.Count; i++)
-								{
-									quaternions.Values[i] *= rotQuat;
-								}
+								vectors.Values[i] = Vector3.Transform(vectors.Values[i], transform);
+							}
+						}
+
+						// Find ROT channels and apply rotation.
+						foreach (var quaternions in rootGroup.GetChunksOfType<QuaternionChannelChunk>())
+						{
+							if (quaternions.Param != "ROT") continue;
+
+							for (int i = 0; i < quaternions.Values.Count; i++)
+							{
+								quaternions.Values[i] *= rotQuat;
 							}
 						}
 					}
-					break;
+				}
+
+				continue;
 			}
 		}
 
