@@ -222,7 +222,7 @@ static class Program {
 					var controller = chunk.GetFirstChunkOfType<MultiControllerChunk>();
 					
 					if (controller == null) break;
-					// Find animations referenced by the Multi Controller
+					// Find animation names referenced by the Multi Controller
 					var controllerTrack = controller.GetFirstChunkOfType<MultiControllerTracksChunk>();
 					if (controllerTrack == null) continue;
 					
@@ -232,14 +232,17 @@ static class Program {
 					{
 						var animationName = track.Name;
 
+						// Find animation chunk that matches the referenced name.
 						var animation = p3dFile.GetFirstChunkOfType<AnimationChunk>(animationName);
 						if (animation == null) continue;
 						
 						foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
 						{
+							// Find animation group that corresponds to the skeleton root chunk.
 							var rootGroup = groupList.GetFirstChunkOfType<AnimationGroupChunk>(rootJoint.Name);
 							if (rootGroup == null) continue;
 							
+							// Find TRAN channels and apply transform.
 							foreach (var vectors in rootGroup.GetChunksOfType<Vector3DOFChannelChunk>())
 							{
 								if (vectors.Param != "TRAN") continue;
@@ -250,6 +253,7 @@ static class Program {
 								}
 							}
 
+							// Find ROT channels and apply rotation.
 							foreach (var quaternions in rootGroup.GetChunksOfType<QuaternionChannelChunk>())
 							{
 								if (quaternions.Param != "ROT") continue;
@@ -295,6 +299,7 @@ static class Program {
 		return args[i + 1];
 	}
 	
+	// Calculate rotation matrix based on euler angles.
 	static Matrix4x4 GetRotationMatrix(float x, float y, float z)
 	{
 		var xMtrx = new Matrix4x4(
