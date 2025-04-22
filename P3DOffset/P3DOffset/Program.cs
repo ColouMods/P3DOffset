@@ -95,6 +95,39 @@ static class Program {
 		// Offset Chunks
 		foreach (var chunk in p3dFile.Chunks)
 		{
+			// Locator (0x3000005)
+			if (chunk is LocatorChunk locatorChunk)
+			{
+				locatorChunk.Position = Vector3.Transform(locatorChunk.Position, transform);
+
+				if (locatorChunk.TypeData is LocatorChunk.Type3LocatorData type3Data)
+				{
+					var rot = type3Data.Rotation;
+					rot += (rotation.Y * deg2Rad);
+					type3Data.Rotation = LimitEulerAngle(rot, radians: true);
+				}
+
+				foreach (var trigger in locatorChunk.GetChunksOfType<TriggerVolumeChunk>())
+				{
+					trigger.Matrix *= transform;
+				}
+				
+				foreach (var matrix in locatorChunk.GetChunksOfType<LocatorMatrixChunk>())
+				{
+					matrix.Matrix *= transform;
+				}
+
+				foreach (var spline in locatorChunk.GetChunksOfType<SplineChunk>())
+				{
+					for (int i = 0; i < spline.Positions.Count; i++)
+					{
+						spline.Positions[i] = Vector3.Transform(spline.Positions[i], transform);;
+					}
+				}
+
+				continue;
+			}
+			
 			// Static Entity (0x3F00000)
 			if (chunk is StaticEntityChunk)
 			{
@@ -308,8 +341,13 @@ static class Program {
 	}
 
 	// Limit the inputted euler angle between -179 and 180 degrees.
-	static float LimitEulerAngle(float angle)
+	static float LimitEulerAngle(float angle, bool radians = false)
 	{
+		if (radians)
+		{
+			return (angle - MathF.PI) % (MathF.PI * -2) + MathF.PI;
+		}
+
 		return (angle - 180) % -360 + 180;
 	}
 	
