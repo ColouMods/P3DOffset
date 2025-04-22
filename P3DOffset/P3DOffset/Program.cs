@@ -45,13 +45,13 @@ static class Program {
 					translation.Z = float.Parse(GetArgValue(args, i));
 					break;
 				case "-rx":
-					rotation.X = float.Parse(GetArgValue(args, i));
+					rotation.X = LimitEulerAngle(float.Parse(GetArgValue(args, i)));
 					break;
 				case "-ry":
-					rotation.Y = float.Parse(GetArgValue(args, i));
+					rotation.Y = LimitEulerAngle(float.Parse(GetArgValue(args, i)));
 					break;
 				case "-rz":
-					rotation.Z = float.Parse(GetArgValue(args, i));
+					rotation.Z = LimitEulerAngle(float.Parse(GetArgValue(args, i)));
 					break;
 			}
 		}
@@ -305,6 +305,12 @@ static class Program {
 			Environment.Exit(1);
 		}
 		return args[i + 1];
+	}
+
+	// Limit the inputted euler angle between -179 and 180 degrees.
+	static float LimitEulerAngle(float angle)
+	{
+		return (angle - 180) % -360 + 180;
 	}
 	
 	// Calculate rotation matrix based on euler angles.
