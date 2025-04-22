@@ -95,6 +95,16 @@ static class Program {
 		// Offset Chunks
 		foreach (var chunk in p3dFile.Chunks)
 		{
+			// Old Billboard Quad Group (0x17002)
+			if (chunk is OldBillboardQuadGroupChunk)
+			{
+				foreach (var billboard in chunk.GetChunksOfType<OldBillboardQuadChunk>())
+				{
+					billboard.Translation = Vector3.Transform(billboard.Translation, transform);
+				}
+				continue;
+			}
+			
 			// Locator (0x3000005)
 			if (chunk is LocatorChunk locatorChunk)
 			{
