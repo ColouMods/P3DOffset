@@ -310,7 +310,7 @@ static class Program {
 
 							for (int i = 0; i < quaternions.Values.Count; i++)
 							{
-								quaternions.Values[i] *= rotQuat;
+								quaternions.Values[i] = rotQuat * quaternions.Values[i];
 							}
 						}
 					}
