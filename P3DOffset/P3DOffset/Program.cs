@@ -110,11 +110,41 @@ static class Program {
 			{
 				locatorChunk.Position = Vector3.Transform(locatorChunk.Position, transform);
 
+				// Locator Type 3
 				if (locatorChunk.TypeData is LocatorChunk.Type3LocatorData type3Data)
 				{
 					var rot = type3Data.Rotation;
 					rot += (rotation.Y * deg2Rad);
 					type3Data.Rotation = LimitEulerAngle(rot, radians: true);
+				}
+				
+				// Locator Type 7
+				if (locatorChunk.TypeData is LocatorChunk.Type7LocatorData type7Data)
+				{
+					var vectors = OffsetLocatorMatrixList(type7Data.Right, type7Data.Up, type7Data.Front);
+
+					type7Data.Right = vectors.right;
+					type7Data.Up = vectors.up;
+					type7Data.Front = vectors.front;
+				}
+				
+				// Locator Type 8
+				if (locatorChunk.TypeData is LocatorChunk.Type8LocatorData type8Data)
+				{
+					var vectors = OffsetLocatorMatrixList(type8Data.Right, type8Data.Up, type8Data.Front);
+
+					type8Data.Right = vectors.right;
+					type8Data.Up = vectors.up;
+					type8Data.Front = vectors.front;
+				}
+				
+				// Locator Type 12
+				if (locatorChunk.TypeData is LocatorChunk.Type12LocatorData type12Data)
+				{
+					if (type12Data.FollowPlayer == 0)
+					{
+						type12Data.TargetPosition = Vector3.Transform(type12Data.TargetPosition, transform);
+					}
 				}
 
 				foreach (var trigger in locatorChunk.GetChunksOfType<TriggerVolumeChunk>())
@@ -389,6 +419,25 @@ static class Program {
 	}
 
 	// Offset Chunk Methods //
+	// Locator (0x3000005) Type 7 & 8
+	static (Vector3 right, Vector3 up, Vector3 front) OffsetLocatorMatrixList(Vector3 right, Vector3 up, Vector3 front)
+	{
+		var matrix = new Matrix4x4(
+			right.X, right.Y, right.Z, 0,
+			up.X, up.Y, up.Z, 0,
+			front.X, front.Y, front.Z, 0,
+			0, 0, 0, 1
+		);
+
+		matrix *= transform;
+		
+		var newRight = new Vector3(matrix.M11, matrix.M12, matrix.M13);
+		var newUp = new Vector3(matrix.M21, matrix.M22, matrix.M23);
+		var newFront = new Vector3(matrix.M31, matrix.M32, matrix.M33);
+
+		return (newRight, newUp, newFront);
+	}
+	
 	// Collision Volume (0x7010001)
 	static void OffsetCollisionVolumes(Chunk chunk)
 	{
