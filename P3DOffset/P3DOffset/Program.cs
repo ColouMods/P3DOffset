@@ -254,7 +254,7 @@ static class Program {
 				continue;
 			}
 
-			// Dyna Phys (0x3F00002), Inst Stat Entity (0x3F00008), Inst Stat Phys (0x3F0000A), & Anim Dyna Phys (0x3F0000E)
+			// Dyna Phys (0x3F00002), Inst Stat Entity (0x3F00009), Inst Stat Phys (0x3F0000A), & Anim Dyna Phys (0x3F0000E)
 			if (chunk is DynaPhysChunk or InstStatEntityChunk or InstStatPhysChunk or AnimDynaPhysChunk)
 			{
 				foreach (var instanceList in chunk.GetChunksOfType<InstanceListChunk>())
@@ -278,6 +278,30 @@ static class Program {
 				}
 
 				continue;
+			}
+			
+			// Fence (0x3F00007)
+			if (chunk is FenceChunk)
+			{
+				foreach (var wall in chunk.GetChunksOfType<WallChunk>())
+				{
+					// Calculate normal from original start/end positions.
+					var calcNormal = CalculateFenceNormal(wall.Start, wall.End, false);
+
+					// Check whether it matches the original normal, if not assume it's inverted.
+					float tolerance = 0.001f;
+					bool inverted = Math.Abs(wall.Normal.X - calcNormal.X) > tolerance;
+					
+					// Calculate new start/end positions.
+					var newStart = Vector3.Transform(wall.Start, transform);
+					wall.Start = new Vector3(newStart.X, 0, newStart.Z);
+					
+					var newEnd = Vector3.Transform(wall.End, transform);
+					wall.End = new Vector3(newEnd.X, 0, newEnd.Z);
+
+					// Calculate normal from new start/end positions.
+					wall.Normal = CalculateFenceNormal(wall.Start, wall.End, inverted);
+				}
 			}
 			
 			// Anim Coll (0x3F00008) & Anim (0x3F0000C)
@@ -416,6 +440,27 @@ static class Program {
 		);
 		
 		return zMtrx * yMtrx * xMtrx;
+	}
+	
+	// Calculate fence normal from start and end point.
+	static Vector3 CalculateFenceNormal(Vector3 v1, Vector3 v2, bool inverted)
+	{
+		// Get 2D direction vector from X and Z values.
+		Vector2 dir = new Vector2(v2.X - v1.X, v2.Z - v1.Z);
+
+		// Get perpendicular direction vector.
+		Vector2 normal2D = new Vector2(-dir.Y, dir.X);
+
+		// Normalize perpendicular vector.
+		normal2D = Vector2.Normalize(normal2D);
+
+		// Return as 3D vector. If it's inverted then invert the X & Z values.
+		if (inverted)
+		{
+			return new Vector3(-normal2D.X, 0, -normal2D.Y);
+		}
+		
+		return new Vector3(normal2D.X, 0, normal2D.Y);
 	}
 
 	// Offset Chunk Methods //
