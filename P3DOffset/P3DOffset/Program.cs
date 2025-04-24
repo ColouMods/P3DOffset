@@ -105,13 +105,28 @@ static class Program {
 				continue;
 			}
 			
-			// Locator (0x3000005)
-			if (chunk is LocatorChunk locatorChunk)
+			// Road (0x3000003)
+			if (chunk is RoadChunk)
 			{
-				locatorChunk.Position = Vector3.Transform(locatorChunk.Position, transform);
+				foreach (var roadSegment in chunk.GetChunksOfType<RoadSegmentChunk>())
+				{
+					roadSegment.Transform *= transform;
+				}
+			}
+			
+			// Intersection (0x3000004)
+			if (chunk is IntersectionChunk intersection)
+			{
+				intersection.Position = Vector3.Transform(intersection.Position, transform);
+			}
+			
+			// Locator (0x3000005)
+			if (chunk is LocatorChunk locator)
+			{
+				locator.Position = Vector3.Transform(locator.Position, transform);
 
 				// Locator Type 3
-				if (locatorChunk.TypeData is LocatorChunk.Type3LocatorData type3Data)
+				if (locator.TypeData is LocatorChunk.Type3LocatorData type3Data)
 				{
 					var rot = type3Data.Rotation;
 					rot += (rotation.Y * deg2Rad);
@@ -119,7 +134,7 @@ static class Program {
 				}
 				
 				// Locator Type 7
-				if (locatorChunk.TypeData is LocatorChunk.Type7LocatorData type7Data)
+				if (locator.TypeData is LocatorChunk.Type7LocatorData type7Data)
 				{
 					var vectors = OffsetLocatorMatrixList(type7Data.Right, type7Data.Up, type7Data.Front);
 
@@ -129,7 +144,7 @@ static class Program {
 				}
 				
 				// Locator Type 8
-				if (locatorChunk.TypeData is LocatorChunk.Type8LocatorData type8Data)
+				if (locator.TypeData is LocatorChunk.Type8LocatorData type8Data)
 				{
 					var vectors = OffsetLocatorMatrixList(type8Data.Right, type8Data.Up, type8Data.Front);
 
@@ -139,7 +154,7 @@ static class Program {
 				}
 				
 				// Locator Type 12
-				if (locatorChunk.TypeData is LocatorChunk.Type12LocatorData type12Data)
+				if (locator.TypeData is LocatorChunk.Type12LocatorData type12Data)
 				{
 					if (type12Data.FollowPlayer == 0)
 					{
@@ -147,17 +162,17 @@ static class Program {
 					}
 				}
 
-				foreach (var trigger in locatorChunk.GetChunksOfType<TriggerVolumeChunk>())
+				foreach (var trigger in locator.GetChunksOfType<TriggerVolumeChunk>())
 				{
 					trigger.Matrix *= transform;
 				}
 				
-				foreach (var matrix in locatorChunk.GetChunksOfType<LocatorMatrixChunk>())
+				foreach (var matrix in locator.GetChunksOfType<LocatorMatrixChunk>())
 				{
 					matrix.Matrix *= transform;
 				}
 
-				foreach (var spline in locatorChunk.GetChunksOfType<SplineChunk>())
+				foreach (var spline in locator.GetChunksOfType<SplineChunk>())
 				{
 					for (int i = 0; i < spline.Positions.Count; i++)
 					{
@@ -169,11 +184,11 @@ static class Program {
 			}
 			
 			// Path (0x300000B)
-			if (chunk is PathChunk pathChunk)
+			if (chunk is PathChunk path)
 			{
-				for (int i = 0; i < pathChunk.Positions.Count; i++)
+				for (int i = 0; i < path.Positions.Count; i++)
 				{
-					pathChunk.Positions[i] = Vector3.Transform(pathChunk.Positions[i], transform);
+					path.Positions[i] = Vector3.Transform(path.Positions[i], transform);
 				}
 			}
 			
@@ -378,8 +393,6 @@ static class Program {
 						}
 					}
 				}
-
-				continue;
 			}
 		}
 
