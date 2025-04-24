@@ -21,18 +21,31 @@ static class Program {
 		var outputPath = string.Empty;
 		var forceOverwrite = false;
 		
+		// Check whether arguments have been passed.
+		if (args.Length == 0)
+		{
+			Console.WriteLine("Error: No arguments specified.");
+			Console.WriteLine();
+			PrintHelp();
+			Environment.Exit(1);
+		}
+		
 		// Get variable values from command line arguments.
 		for (int i = 0; i < args.Length; i++)
 		{
 			switch (args[i])
 			{
-				case "-i":
+				case "-h" or "--help":
+					PrintHelp();
+					Environment.Exit(0);
+					break;
+				case "-i" or "--input":
 					inputPath = GetArgValue(args, i);
 					break;
-				case "-o":
+				case "-o" or "--output":
 					outputPath = GetArgValue(args, i);
 					break;
-				case "-f":
+				case "-f" or "--force":
 					forceOverwrite = true;
 					break;
 				case "-x":
@@ -72,20 +85,20 @@ static class Program {
 		if (string.IsNullOrEmpty(inputPath))
 		{
 			Console.WriteLine("Error: No input file specified.");
-			Environment.Exit(2);
+			Environment.Exit(3);
 		}
 
 		if (string.IsNullOrEmpty(outputPath))
 		{
 			Console.WriteLine("Error: No output file specified.");
-			Environment.Exit(2);
+			Environment.Exit(3);
 		}
 
 		// Check input file exists.
 		if (File.Exists(inputPath) == false)
 		{
 			Console.WriteLine("Error: Input file does not exist.");
-			Environment.Exit(3);
+			Environment.Exit(4);
 		}
 
 		// Create P3DFile Object
@@ -405,7 +418,7 @@ static class Program {
 			if (response != null && response.ToLower()[0] != 'y')
 			{
 				Console.WriteLine("Error: File could not be written.");
-				Environment.Exit(4);
+				Environment.Exit(5);
 			}
 		}
 
@@ -414,14 +427,37 @@ static class Program {
 		Console.WriteLine("Successfully wrote file!");
 		Environment.Exit(0);
 	}
+	
+	// Display help message.
+	static void PrintHelp()
+	{
+		Console.WriteLine("Usage: P3DOffset [options]");
+		Console.WriteLine();
+		Console.WriteLine("Options:");
+		Console.WriteLine("    -h, --help      Display help message.");
+		Console.WriteLine("    -i, --input     Set path to the input file. Required.");
+		Console.WriteLine("    -o, --output    Set path to the output file. Required.");
+		Console.WriteLine("    -f, --force     Force overwrite the output file.");
+		Console.WriteLine("    -x              Set X position offset.");
+		Console.WriteLine("    -y              Set Y position offset.");
+		Console.WriteLine("    -z              Set Z position offset.");
+		Console.WriteLine("    -rx             Set X rotation offset.");
+		Console.WriteLine("    -ry             Set Y rotation offset.");
+		Console.WriteLine("    -rz             Set Z rotation offset.");
+		Console.WriteLine();
+		Console.WriteLine("Example:");
+		Console.WriteLine("    P3DOffset -i C:\\input\\file.p3d -o C:\\output\\file.p3d -x 100 -z 50");
+		Console.WriteLine("    P3DOffset -i C:\\input\\file.p3d -o C:\\output\\file.p3d -f -ry 90");
+		Console.WriteLine();
+	}
 
 	// Get command line argument with error handling.
 	static string GetArgValue(string[] args, int i)
 	{
-		if (i == args.Length)
+		if (i + 1 == args.Length)
 		{
-			Console.WriteLine($"Error: No value provided for {args[i]}.");
-			Environment.Exit(1);
+			Console.WriteLine($"Error: No value provided for \"{args[i]}\".");
+			Environment.Exit(2);
 		}
 		return args[i + 1];
 	}
