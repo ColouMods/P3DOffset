@@ -161,11 +161,20 @@ static class Program {
 				{
 					for (int i = 0; i < spline.Positions.Count; i++)
 					{
-						spline.Positions[i] = Vector3.Transform(spline.Positions[i], transform);;
+						spline.Positions[i] = Vector3.Transform(spline.Positions[i], transform);
 					}
 				}
 
 				continue;
+			}
+			
+			// Path (0x300000B)
+			if (chunk is PathChunk pathChunk)
+			{
+				for (int i = 0; i < pathChunk.Positions.Count; i++)
+				{
+					pathChunk.Positions[i] = Vector3.Transform(pathChunk.Positions[i], transform);
+				}
 			}
 			
 			// Static Entity (0x3F00000)
