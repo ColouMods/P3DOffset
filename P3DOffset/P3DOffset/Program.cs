@@ -20,6 +20,8 @@ static class Program {
 		var inputPath = string.Empty;
 		var outputPath = string.Empty;
 		var forceOverwrite = false;
+		var drawables = new List<string>();
+		var scenegraphs = new List<string>();
 		
 		// Check whether arguments have been passed.
 		if (args.Length == 0)
@@ -66,6 +68,12 @@ static class Program {
 				case "-rz":
 					rotation.Z = LimitEulerAngle(float.Parse(GetArgValue(args, i)));
 					break;
+				case "-d" or "--drawable":
+					drawables.Add(GetArgValue(args, i));
+					break;
+				case "-s" or "--scenegraph":
+					scenegraphs.Add(GetArgValue(args, i));
+					break;
 			}
 		}
 		
@@ -108,6 +116,15 @@ static class Program {
 		// Offset Chunks
 		foreach (var chunk in p3dFile.Chunks)
 		{
+			// Composite Drawable (0x4512)
+			if (chunk is CompositeDrawableChunk compositeDrawable)
+			{
+				if (drawables.Contains(compositeDrawable.Name))
+				{
+					OffsetDrawable(compositeDrawable, p3dFile);
+				}
+			}
+			
 			// Old Billboard Quad Group (0x17002)
 			if (chunk is OldBillboardQuadGroupChunk)
 			{
@@ -116,6 +133,15 @@ static class Program {
 					billboard.Translation = Vector3.Transform(billboard.Translation, transform);
 				}
 				continue;
+			}
+			
+			// Scenegraph (0x120100)
+			if (chunk is ScenegraphChunk scenegraphChunk)
+			{
+				if (scenegraphs.Contains(scenegraphChunk.Name))
+				{
+					OffsetScenegraph(scenegraphChunk);
+				}
 			}
 			
 			// Road (0x3000003)
@@ -298,19 +324,7 @@ static class Program {
 				{
 					foreach (var scenegraph in instanceList.GetChunksOfType<ScenegraphChunk>())
 					{
-						foreach (var scenegraphRoot in scenegraph.GetChunksOfType<OldScenegraphRootChunk>())
-						{
-							foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
-							{
-								foreach (var scenegraphTransform in scenegraphBranch.GetChunksOfType<OldScenegraphTransformChunk>())
-								{
-									foreach (var subScenegraphTransform in scenegraphTransform.GetChunksOfType<OldScenegraphTransformChunk>())
-									{
-										subScenegraphTransform.Transform *= transform;
-									}
-								}
-							}
-						}
+						OffsetScenegraph(scenegraph);
 					}
 				}
 
@@ -344,67 +358,9 @@ static class Program {
 			// Anim Coll (0x3F00008) & Anim (0x3F0000C)
 			if (chunk is AnimCollChunk or AnimChunk)
 			{
-				var drawable = chunk.GetFirstChunkOfType<CompositeDrawableChunk>();
-				if (drawable == null) break;
-
-				// Find skeleton referenced by the Composite Drawable.
-				var skeletonName = drawable.SkeletonName;
-
-				var skeleton = p3dFile.GetFirstChunkOfType<SkeletonChunk>(skeletonName);
-				if (skeleton == null) break;
-
-				// Find root joint of the skeleton.
-				var rootJoint = skeleton.GetFirstChunkOfType<SkeletonJointChunk>();
-				if (rootJoint == null) break;
-
-				// Apply transform to root joint.
-				rootJoint.RestPose *= transform;
-
-				var controller = chunk.GetFirstChunkOfType<MultiControllerChunk>();
-
-				if (controller == null) break;
-				// Find animation names referenced by the Multi Controller
-				var controllerTrack = controller.GetFirstChunkOfType<MultiControllerTracksChunk>();
-				if (controllerTrack == null) continue;
-
-				var tracks = controllerTrack.Tracks;
-
-				foreach (var track in tracks)
+				foreach (var drawable in chunk.GetChunksOfType<CompositeDrawableChunk>())
 				{
-					var animationName = track.Name;
-
-					// Find animation chunk that matches the referenced name.
-					var animation = p3dFile.GetFirstChunkOfType<AnimationChunk>(animationName);
-					if (animation == null) continue;
-
-					foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
-					{
-						// Find animation group that corresponds to the skeleton root chunk.
-						var rootGroup = groupList.GetFirstChunkOfType<AnimationGroupChunk>(rootJoint.Name);
-						if (rootGroup == null) continue;
-
-						// Find TRAN channels and apply transform.
-						foreach (var vectors in rootGroup.GetChunksOfType<Vector3DOFChannelChunk>())
-						{
-							if (vectors.Param != "TRAN") continue;
-
-							for (int i = 0; i < vectors.Values.Count; i++)
-							{
-								vectors.Values[i] = Vector3.Transform(vectors.Values[i], transform);
-							}
-						}
-
-						// Find ROT channels and apply rotation.
-						foreach (var quaternions in rootGroup.GetChunksOfType<QuaternionChannelChunk>())
-						{
-							if (quaternions.Param != "ROT") continue;
-
-							for (int i = 0; i < quaternions.Values.Count; i++)
-							{
-								quaternions.Values[i] = rotQuat * quaternions.Values[i];
-							}
-						}
-					}
+					OffsetDrawable(drawable, p3dFile, chunk);
 				}
 			}
 		}
@@ -434,16 +390,18 @@ static class Program {
 		Console.WriteLine("Usage: P3DOffset [options]");
 		Console.WriteLine();
 		Console.WriteLine("Options:");
-		Console.WriteLine("    -h, --help      Display help message.");
-		Console.WriteLine("    -i, --input     Set path to the input file. Required.");
-		Console.WriteLine("    -o, --output    Set path to the output file. Required.");
-		Console.WriteLine("    -f, --force     Force overwrite the output file.");
-		Console.WriteLine("    -x              Set X position offset.");
-		Console.WriteLine("    -y              Set Y position offset.");
-		Console.WriteLine("    -z              Set Z position offset.");
-		Console.WriteLine("    -rx             Set X rotation offset.");
-		Console.WriteLine("    -ry             Set Y rotation offset.");
-		Console.WriteLine("    -rz             Set Z rotation offset.");
+		Console.WriteLine("    -h, --help          Display help message.");
+		Console.WriteLine("    -i, --input         Set path to the input file. Required.");
+		Console.WriteLine("    -o, --output        Set path to the output file. Required.");
+		Console.WriteLine("    -f, --force         Force overwrite the output file.");
+		Console.WriteLine("    -x                  Set X position offset.");
+		Console.WriteLine("    -y                  Set Y position offset.");
+		Console.WriteLine("    -z                  Set Z position offset.");
+		Console.WriteLine("    -rx                 Set X rotation offset.");
+		Console.WriteLine("    -ry                 Set Y rotation offset.");
+		Console.WriteLine("    -rz                 Set Z rotation offset.");
+		Console.WriteLine("    -d, --drawable      Name of Composite Drawable to offset. Repeat for multiple.");
+		Console.WriteLine("    -s, --scenegraph    Name of Scenegraph to offset. Repeat for multiple.");
 		Console.WriteLine();
 		Console.WriteLine("Example:");
 		Console.WriteLine("    P3DOffset -i C:\\input\\file.p3d -o C:\\output\\file.p3d -x 100 -z 50");
@@ -522,6 +480,99 @@ static class Program {
 	}
 
 	// Offset Chunk Methods //
+	// Composite Drawable (0x4512)
+	static void OffsetDrawable(CompositeDrawableChunk drawable, P3DFile p3dFile, Chunk? root = null)
+	{
+		// Find skeleton referenced by the Composite Drawable.
+		var skeletonName = drawable.SkeletonName;
+
+		var skeleton = p3dFile.GetFirstChunkOfType<SkeletonChunk>(skeletonName);
+		if (skeleton == null) return;
+
+		// Find root joint of the skeleton.
+		var rootJoint = skeleton.GetFirstChunkOfType<SkeletonJointChunk>();
+		if (rootJoint == null) return;
+
+		// Apply transform to root joint.
+		rootJoint.RestPose *= transform;
+
+		var controller = root is null ? p3dFile.GetFirstChunkOfType<MultiControllerChunk>() : root.GetFirstChunkOfType<MultiControllerChunk>();
+		if (controller == null) return;
+		
+		// Find animation names referenced by the Multi Controller
+		var controllerTrack = controller.GetFirstChunkOfType<MultiControllerTracksChunk>();
+		if (controllerTrack == null) return;
+
+		var tracks = controllerTrack.Tracks;
+
+		foreach (var track in tracks)
+		{
+			var animationName = track.Name;
+
+			// Find animation chunk that matches the referenced name.
+			var animation = p3dFile.GetFirstChunkOfType<AnimationChunk>(animationName);
+			if (animation == null) continue;
+
+			foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
+			{
+				// Find animation group that corresponds to the skeleton root chunk.
+				var rootGroup = groupList.GetFirstChunkOfType<AnimationGroupChunk>(rootJoint.Name);
+				if (rootGroup == null) continue;
+
+				// Find TRAN channels and apply transform.
+				foreach (var vectors in rootGroup.GetChunksOfType<Vector3DOFChannelChunk>())
+				{
+					if (vectors.Param != "TRAN") continue;
+
+					for (int i = 0; i < vectors.Values.Count; i++)
+					{
+						vectors.Values[i] = Vector3.Transform(vectors.Values[i], transform);
+					}
+				}
+
+				// Find ROT channels and apply rotation.
+				foreach (var quaternions in rootGroup.GetChunksOfType<QuaternionChannelChunk>())
+				{
+					if (quaternions.Param != "ROT") continue;
+
+					for (int i = 0; i < quaternions.Values.Count; i++)
+					{
+						quaternions.Values[i] = rotQuat * quaternions.Values[i];
+					}
+				}
+				
+				// Find compressed ROT channels and apply rotation.
+				foreach (var quaternions in rootGroup.GetChunksOfType<CompressedQuaternionChannelChunk>())
+				{
+					if (quaternions.Param != "ROT") continue;
+
+					for (int i = 0; i < quaternions.Values.Count; i++)
+					{
+						quaternions.Values[i] = rotQuat * quaternions.Values[i];
+					}
+				}
+			}
+		}
+	}
+
+	// Scenegraph (0x120100)
+	static void OffsetScenegraph(ScenegraphChunk scenegraph)
+	{
+		foreach (var scenegraphRoot in scenegraph.GetChunksOfType<OldScenegraphRootChunk>())
+		{
+			foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
+			{
+				foreach (var scenegraphTransform in scenegraphBranch.GetChunksOfType<OldScenegraphTransformChunk>())
+				{
+					foreach (var subScenegraphTransform in scenegraphTransform.GetChunksOfType<OldScenegraphTransformChunk>())
+					{
+						subScenegraphTransform.Transform *= transform;
+					}
+				}
+			}
+		}
+	}
+	
 	// Locator (0x3000005) Type 7 & 8
 	static (Vector3 right, Vector3 up, Vector3 front) OffsetLocatorMatrixList(Vector3 right, Vector3 up, Vector3 front)
 	{
