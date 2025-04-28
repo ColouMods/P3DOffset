@@ -9,6 +9,7 @@ static class Program {
 	const float deg2Rad = MathF.PI / 180;
 
 	// Initialise static variables.
+	static P3DFile p3dFile = new P3DFile();
 	static Vector3 translation = new Vector3(0, 0, 0);
 	static Vector3 rotation = new Vector3(0, 0, 0);
 	static Matrix4x4 transform;
@@ -20,8 +21,7 @@ static class Program {
 		var inputPath = string.Empty;
 		var outputPath = string.Empty;
 		var forceOverwrite = false;
-		var drawables = new List<string>();
-		var scenegraphs = new List<string>();
+		var usedDrawables = new List<string>();
 		
 		// Check whether arguments have been passed.
 		if (args.Length == 0)
@@ -68,12 +68,6 @@ static class Program {
 				case "-rz":
 					rotation.Z = LimitEulerAngle(float.Parse(GetArgValue(args, i)));
 					break;
-				case "-d" or "--drawable":
-					drawables.Add(GetArgValue(args, i));
-					break;
-				case "-s" or "--scenegraph":
-					scenegraphs.Add(GetArgValue(args, i));
-					break;
 			}
 		}
 		
@@ -111,24 +105,13 @@ static class Program {
 
 		// Create P3DFile Object
 		Console.WriteLine($"Reading {inputPath}...");
-		P3DFile p3dFile = new(inputPath);
+		p3dFile = new P3DFile(inputPath);
 
 		// Offset Chunks
 		foreach (var chunk in p3dFile.Chunks)
 		{
 			switch (chunk)
 			{
-				// Composite Drawable (0x4512)
-				case CompositeDrawableChunk compositeDrawable:
-				{
-					if (drawables.Contains(compositeDrawable.Name))
-					{
-						OffsetDrawable(compositeDrawable, p3dFile);
-					}
-
-					break;
-				}
-				
 				// Old Billboard Quad Group (0x17002)
 				case OldBillboardQuadGroupChunk:
 				{
@@ -141,11 +124,36 @@ static class Program {
 				}
 				
 				// Scenegraph (0x120100)
-				case ScenegraphChunk scenegraphChunk:
+				case ScenegraphChunk scenegraph:
 				{
-					if (scenegraphs.Contains(scenegraphChunk.Name))
+					foreach (var scenegraphRoot in scenegraph.GetChunksOfType<OldScenegraphRootChunk>())
 					{
-						OffsetScenegraph(scenegraphChunk);
+						foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
+						{
+							foreach (var scenegraphTransform in scenegraphBranch.GetChunksOfType<OldScenegraphTransformChunk>())
+							{
+								scenegraphTransform.Transform *= transform;
+							}
+
+							foreach (var scenegraphDrawable in scenegraphBranch.GetChunksOfType<OldScenegraphDrawableChunk>())
+							{
+								// If a drawable isn't within a transform, it needs to be offset directly.
+								// Drawables can be either Composite Drawables or Meshes, so need to figure out which one it is first.
+								var compositeDrawable = p3dFile.GetFirstChunkOfType<CompositeDrawableChunk>(scenegraphDrawable.DrawableName);
+								if (compositeDrawable != null)
+								{
+									usedDrawables.Add(compositeDrawable.Name);
+									OffsetDrawable(compositeDrawable);
+									continue;
+								}
+								
+								var mesh = p3dFile.GetFirstChunkOfType<MeshChunk>(scenegraphDrawable.DrawableName);
+								if (mesh != null)
+								{
+									OffsetMeshOrSkin(mesh);
+								}
+							}
+						}
 					}
 				
 					break;
@@ -248,71 +256,7 @@ static class Program {
 				{
 					foreach (var mesh in chunk.GetChunksOfType<MeshChunk>())
 					{
-						float? lowX = null, lowY = null, lowZ = null;
-						float? highX = null, highY = null, highZ = null;
-
-						foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
-						{
-							var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
-							if (positionList == null) continue;
-
-							for (int i = 0; i < positionList.Positions.Count; i++)
-							{
-								// Apply transform to each vertex position.
-								var pos = positionList.Positions[i];
-								var newPos = Vector3.Transform(pos, transform);
-								positionList.Positions[i] = newPos;
-
-								// Find min and max X, Y and Z values.
-								lowX = Math.Min(lowX ?? newPos.X,
-									newPos.X); // If lowX is null, newPos.X is substituted in instead.
-								lowY = Math.Min(lowY ?? newPos.Y, newPos.Y);
-								lowZ = Math.Min(lowZ ?? newPos.Z, newPos.Z);
-
-								highX = Math.Max(highX ?? newPos.X, newPos.X);
-								highY = Math.Max(highY ?? newPos.Y, newPos.Y);
-								highZ = Math.Max(highZ ?? newPos.Z, newPos.Z);
-							}
-						}
-
-						// Set Bounding Box values.
-						var bbLow = new Vector3(lowX ?? 0, lowY ?? 0, lowZ ?? 0);
-						var bbHigh = new Vector3(highX ?? 0, highY ?? 0, highZ ?? 0);
-
-						var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
-
-						if (boundingBox != null)
-						{
-							boundingBox.Low = bbLow;
-							boundingBox.High = bbHigh;
-						}
-
-						// Set Bounding Sphere values.
-						var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
-
-						if (boundingSphere != null)
-						{
-							boundingSphere.Centre = new Vector3(
-								(bbLow.X + bbHigh.X) / 2,
-								(bbLow.Y + bbHigh.Y) / 2,
-								(bbLow.Z + bbHigh.Z) / 2);
-
-							// Find furthest away vertex from the bounding sphere centre.
-							float? maxDist = null;
-							foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
-							{
-								var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
-								if (positionList == null) continue;
-
-								foreach (var position in positionList.Positions)
-								{
-									var dist = Vector3.Distance(position, boundingSphere.Centre);
-									maxDist = Math.Max(maxDist ?? dist, dist);
-								}
-							}
-
-							boundingSphere.Radius = maxDist ?? 0;
-						}
+						OffsetMeshOrSkin(mesh);
 					}
 
 					break;
@@ -334,9 +278,24 @@ static class Program {
 				{
 					foreach (var instanceList in chunk.GetChunksOfType<InstanceListChunk>())
 					{
+						// In Instance Lists, only the second Scenegraph Transform in the Scenegraph hierarchy is
+						// actually used - everything else is ignored. Hence, these need to be handled differently
+						// than regular Scenegraph chunks.
 						foreach (var scenegraph in instanceList.GetChunksOfType<ScenegraphChunk>())
 						{
-							OffsetScenegraph(scenegraph);
+							foreach (var scenegraphRoot in scenegraph.GetChunksOfType<OldScenegraphRootChunk>())
+							{
+								foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
+								{
+									foreach (var scenegraphTransform in scenegraphBranch.GetChunksOfType<OldScenegraphTransformChunk>())
+									{
+										foreach (var subScenegraphTransform in scenegraphTransform.GetChunksOfType<OldScenegraphTransformChunk>())
+										{
+											subScenegraphTransform.Transform *= transform;
+										}
+									}
+								}
+							}
 						}
 					}
 
@@ -374,7 +333,7 @@ static class Program {
 				{
 					foreach (var drawable in chunk.GetChunksOfType<CompositeDrawableChunk>())
 					{
-						OffsetDrawable(drawable, p3dFile, chunk);
+						OffsetDrawable(drawable, chunk);
 					}
 
 					break;
@@ -392,6 +351,15 @@ static class Program {
 			{
 				Console.WriteLine("Error: File could not be written.");
 				Environment.Exit(5);
+			}
+		}
+
+		// Composite Drawable (0x4512)
+		foreach (var drawable in p3dFile.GetChunksOfType<CompositeDrawableChunk>())
+		{
+			if (!usedDrawables.Contains(drawable.Name))
+			{
+				OffsetDrawable(drawable);
 			}
 		}
 
@@ -417,8 +385,6 @@ static class Program {
 		Console.WriteLine("    -rx                 Set X rotation offset.");
 		Console.WriteLine("    -ry                 Set Y rotation offset.");
 		Console.WriteLine("    -rz                 Set Z rotation offset.");
-		Console.WriteLine("    -d, --drawable      Name of Composite Drawable to offset. Repeat for multiple.");
-		Console.WriteLine("    -s, --scenegraph    Name of Scenegraph to offset. Repeat for multiple.");
 		Console.WriteLine();
 		Console.WriteLine("Example:");
 		Console.WriteLine("    P3DOffset -i C:\\input\\file.p3d -o C:\\output\\file.p3d -x 100 -z 50");
@@ -498,21 +464,33 @@ static class Program {
 
 	// Offset Chunk Methods //
 	// Composite Drawable (0x4512)
-	static void OffsetDrawable(CompositeDrawableChunk drawable, P3DFile p3dFile, Chunk? root = null)
+	static void OffsetDrawable(CompositeDrawableChunk drawable, Chunk? root = null)
 	{
+		// Find skin chunks used by the Composite Drawable.
+		foreach (var skinList in drawable.GetChunksOfType<CompositeDrawableSkinListChunk>())
+		{
+			foreach (var drawableSkin in skinList.GetChunksOfType<CompositeDrawableSkinChunk>())
+			{
+				// Find & offset skin referenced by the Composite Drawable Skin.
+				var skin = p3dFile.GetFirstChunkOfType<SkinChunk>(drawableSkin.Name);
+				if (skin == null) continue;
+				OffsetMeshOrSkin(skin);
+			}
+		}
+		
 		// Find skeleton referenced by the Composite Drawable.
 		var skeletonName = drawable.SkeletonName;
 
 		var skeleton = p3dFile.GetFirstChunkOfType<SkeletonChunk>(skeletonName);
 		if (skeleton == null) return;
 
-		// Find root joint of the skeleton.
+		// Find root joint of the skeleton and apply transform.
 		var rootJoint = skeleton.GetFirstChunkOfType<SkeletonJointChunk>();
 		if (rootJoint == null) return;
-
-		// Apply transform to root joint.
+		
 		rootJoint.RestPose *= transform;
 
+		// Find Multi Controller in root chunk. If root is null, find in file instead.
 		var controller = root is null ? p3dFile.GetFirstChunkOfType<MultiControllerChunk>() : root.GetFirstChunkOfType<MultiControllerChunk>();
 		if (controller == null) return;
 		
@@ -571,22 +549,74 @@ static class Program {
 			}
 		}
 	}
-
-	// Scenegraph (0x120100)
-	static void OffsetScenegraph(ScenegraphChunk scenegraph)
+	
+	// Mesh (0x10000) & Skin (0x10001)
+	static void OffsetMeshOrSkin(Chunk mesh)
 	{
-		foreach (var scenegraphRoot in scenegraph.GetChunksOfType<OldScenegraphRootChunk>())
+		float? lowX = null, lowY = null, lowZ = null;
+		float? highX = null, highY = null, highZ = null;
+
+		foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
 		{
-			foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
+			var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
+			if (positionList == null) continue;
+
+			for (int i = 0; i < positionList.Positions.Count; i++)
 			{
-				foreach (var scenegraphTransform in scenegraphBranch.GetChunksOfType<OldScenegraphTransformChunk>())
+				// Apply transform to each vertex position.
+				var pos = positionList.Positions[i];
+				var newPos = Vector3.Transform(pos, transform);
+				positionList.Positions[i] = newPos;
+
+				// Find min and max X, Y and Z values.
+				lowX = Math.Min(lowX ?? newPos.X,
+					newPos.X); // If lowX is null, newPos.X is substituted in instead.
+				lowY = Math.Min(lowY ?? newPos.Y, newPos.Y);
+				lowZ = Math.Min(lowZ ?? newPos.Z, newPos.Z);
+
+				highX = Math.Max(highX ?? newPos.X, newPos.X);
+				highY = Math.Max(highY ?? newPos.Y, newPos.Y);
+				highZ = Math.Max(highZ ?? newPos.Z, newPos.Z);
+			}
+		}
+
+		// Set Bounding Box values.
+		var bbLow = new Vector3(lowX ?? 0, lowY ?? 0, lowZ ?? 0);
+		var bbHigh = new Vector3(highX ?? 0, highY ?? 0, highZ ?? 0);
+
+		var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
+
+		if (boundingBox != null)
+		{
+			boundingBox.Low = bbLow;
+			boundingBox.High = bbHigh;
+		}
+
+		// Set Bounding Sphere values.
+		var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
+
+		if (boundingSphere != null)
+		{
+			boundingSphere.Centre = new Vector3(
+				(bbLow.X + bbHigh.X) / 2,
+				(bbLow.Y + bbHigh.Y) / 2,
+				(bbLow.Z + bbHigh.Z) / 2);
+
+			// Find furthest away vertex from the bounding sphere centre.
+			float? maxDist = null;
+			foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
+			{
+				var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
+				if (positionList == null) continue;
+
+				foreach (var position in positionList.Positions)
 				{
-					foreach (var subScenegraphTransform in scenegraphTransform.GetChunksOfType<OldScenegraphTransformChunk>())
-					{
-						subScenegraphTransform.Transform *= transform;
-					}
+					var dist = Vector3.Distance(position, boundingSphere.Centre);
+					maxDist = Math.Max(maxDist ?? dist, dist);
 				}
 			}
+
+			boundingSphere.Radius = maxDist ?? 0;
 		}
 	}
 	
