@@ -123,6 +123,8 @@ static class Program {
 				{
 					OffsetDrawable(compositeDrawable, p3dFile);
 				}
+
+				continue;
 			}
 			
 			// Old Billboard Quad Group (0x17002)
@@ -132,6 +134,7 @@ static class Program {
 				{
 					billboard.Translation = Vector3.Transform(billboard.Translation, transform);
 				}
+				
 				continue;
 			}
 			
@@ -142,6 +145,8 @@ static class Program {
 				{
 					OffsetScenegraph(scenegraphChunk);
 				}
+				
+				continue;
 			}
 			
 			// Road (0x3000003)
@@ -151,12 +156,15 @@ static class Program {
 				{
 					roadSegment.Transform *= transform;
 				}
+				
+				continue;
 			}
 			
 			// Intersection (0x3000004)
 			if (chunk is IntersectionChunk intersection)
 			{
 				intersection.Position = Vector3.Transform(intersection.Position, transform);
+				continue;
 			}
 			
 			// Locator (0x3000005)
@@ -229,6 +237,8 @@ static class Program {
 				{
 					path.Positions[i] = Vector3.Transform(path.Positions[i], transform);
 				}
+
+				continue;
 			}
 			
 			// Static Entity (0x3F00000)
@@ -353,6 +363,8 @@ static class Program {
 					// Calculate normal from new start/end positions.
 					wall.Normal = CalculateFenceNormal(wall.Start, wall.End, inverted);
 				}
+
+				continue;
 			}
 			
 			// Anim Coll (0x3F00008) & Anim (0x3F0000C)
@@ -362,6 +374,8 @@ static class Program {
 				{
 					OffsetDrawable(drawable, p3dFile, chunk);
 				}
+
+				continue;
 			}
 		}
 
