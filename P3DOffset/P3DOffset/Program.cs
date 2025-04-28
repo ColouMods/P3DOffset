@@ -464,7 +464,7 @@ static class Program {
 
 	// Offset Chunk Methods //
 	// Composite Drawable (0x4512)
-	static void OffsetDrawable(CompositeDrawableChunk drawable, Chunk? root = null)
+	static void OffsetDrawable(CompositeDrawableChunk drawable, Chunk? rootChunk = null)
 	{
 		// Find skin chunks used by the Composite Drawable.
 		foreach (var skinList in drawable.GetChunksOfType<CompositeDrawableSkinListChunk>())
@@ -489,65 +489,8 @@ static class Program {
 		if (rootJoint == null) return;
 		
 		rootJoint.RestPose *= transform;
-
-		// Find Multi Controller in root chunk. If root is null, find in file instead.
-		var controller = root is null ? p3dFile.GetFirstChunkOfType<MultiControllerChunk>() : root.GetFirstChunkOfType<MultiControllerChunk>();
-		if (controller == null) return;
 		
-		// Find animation names referenced by the Multi Controller
-		var controllerTrack = controller.GetFirstChunkOfType<MultiControllerTracksChunk>();
-		if (controllerTrack == null) return;
-
-		var tracks = controllerTrack.Tracks;
-
-		foreach (var track in tracks)
-		{
-			var animationName = track.Name;
-
-			// Find animation chunk that matches the referenced name.
-			var animation = p3dFile.GetFirstChunkOfType<AnimationChunk>(animationName);
-			if (animation == null) continue;
-
-			foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
-			{
-				// Find animation group that corresponds to the skeleton root chunk.
-				var rootGroup = groupList.GetFirstChunkOfType<AnimationGroupChunk>(rootJoint.Name);
-				if (rootGroup == null) continue;
-
-				// Find vector channels and apply transform.
-				foreach (var vectors in rootGroup.GetChunksOfType<Vector3DOFChannelChunk>())
-				{
-					if (vectors.Param is not ("TRAN" or "LOOK" or "UP")) continue;
-
-					for (int i = 0; i < vectors.Values.Count; i++)
-					{
-						vectors.Values[i] = Vector3.Transform(vectors.Values[i], transform);
-					}
-				}
-
-				// Find quaternion channels and apply rotation.
-				foreach (var quaternions in rootGroup.GetChunksOfType<QuaternionChannelChunk>())
-				{
-					if (quaternions.Param != "ROT") continue;
-
-					for (int i = 0; i < quaternions.Values.Count; i++)
-					{
-						quaternions.Values[i] = rotQuat * quaternions.Values[i];
-					}
-				}
-				
-				// Find compressed quaternion channels and apply rotation.
-				foreach (var quaternions in rootGroup.GetChunksOfType<CompressedQuaternionChannelChunk>())
-				{
-					if (quaternions.Param != "ROT") continue;
-
-					for (int i = 0; i < quaternions.Values.Count; i++)
-					{
-						quaternions.Values[i] = rotQuat * quaternions.Values[i];
-					}
-				}
-			}
-		}
+		OffsetAnimation(skeleton.Name, rootJoint.Name, rootChunk);
 	}
 	
 	// Mesh (0x10000) & Skin (0x10001)
@@ -617,6 +560,65 @@ static class Program {
 			}
 
 			boundingSphere.Radius = maxDist ?? 0;
+		}
+	}
+	
+	// Animation (0x121000)
+	static void OffsetAnimation(string hierarchyName, string rootJointName, Chunk? rootChunk = null)
+	{
+		// Find all Old Frame Controllers in root chunk. If root is null, find in file instead.
+		var controllers = rootChunk is null
+			? p3dFile.GetChunksOfType<OldFrameControllerChunk>()
+			: rootChunk.GetChunksOfType<OldFrameControllerChunk>();
+		
+		foreach (var controller in controllers)
+		{
+			// Check if frame controller references hierarchy name.
+			if (controller.HierarchyName != hierarchyName) continue;
+
+			// Find animation chunk referenced by the frame controller.
+			var animation = p3dFile.GetFirstChunkOfType<AnimationChunk>(controller.AnimationName);
+			if (animation == null) continue;
+
+			foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
+			{
+				// Find animation group that corresponds to the root name.
+				var rootGroup = groupList.GetFirstChunkOfType<AnimationGroupChunk>(rootJointName);
+				if (rootGroup == null) continue;
+
+				// Find vector channels and apply transform.
+				foreach (var vectors in rootGroup.GetChunksOfType<Vector3DOFChannelChunk>())
+				{
+					if (vectors.Param is not ("TRAN" or "LOOK" or "UP")) continue;
+
+					for (int i = 0; i < vectors.Values.Count; i++)
+					{
+						vectors.Values[i] = Vector3.Transform(vectors.Values[i], transform);
+					}
+				}
+
+				// Find quaternion channels and apply rotation.
+				foreach (var quaternions in rootGroup.GetChunksOfType<QuaternionChannelChunk>())
+				{
+					if (quaternions.Param != "ROT") continue;
+
+					for (int i = 0; i < quaternions.Values.Count; i++)
+					{
+						quaternions.Values[i] = rotQuat * quaternions.Values[i];
+					}
+				}
+				
+				// Find compressed quaternion channels and apply rotation.
+				foreach (var quaternions in rootGroup.GetChunksOfType<CompressedQuaternionChannelChunk>())
+				{
+					if (quaternions.Param != "ROT") continue;
+
+					for (int i = 0; i < quaternions.Values.Count; i++)
+					{
+						quaternions.Values[i] = rotQuat * quaternions.Values[i];
+					}
+				}
+			}
 		}
 	}
 	
