@@ -197,7 +197,16 @@ static class Program {
 					if (locator.TypeData is LocatorChunk.Type3LocatorData type3Data)
 					{
 						var rot = type3Data.Rotation;
-						rot += (rotation.Y * deg2Rad);
+						
+						// Convert rotation to forward vector.
+						var forward = new Vector3(MathF.Sin(rot), 0, MathF.Cos(rot));
+						
+						// Apply transform to forward vector.
+						forward = Vector3.Transform(forward, transform);
+						
+						// Extract new rotation from transformed forward vector.
+						rot = float.Atan2(forward.X, forward.Z);
+						
 						type3Data.Rotation = LimitEulerAngle(rot, radians: true);
 					}
 				
