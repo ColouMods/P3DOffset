@@ -514,10 +514,10 @@ static class Program {
 				var rootGroup = groupList.GetFirstChunkOfType<AnimationGroupChunk>(rootJoint.Name);
 				if (rootGroup == null) continue;
 
-				// Find TRAN channels and apply transform.
+				// Find vector channels and apply transform.
 				foreach (var vectors in rootGroup.GetChunksOfType<Vector3DOFChannelChunk>())
 				{
-					if (vectors.Param != "TRAN") continue;
+					if (vectors.Param is not ("TRAN" or "LOOK" or "UP")) continue;
 
 					for (int i = 0; i < vectors.Values.Count; i++)
 					{
@@ -525,7 +525,7 @@ static class Program {
 					}
 				}
 
-				// Find ROT channels and apply rotation.
+				// Find quaternion channels and apply rotation.
 				foreach (var quaternions in rootGroup.GetChunksOfType<QuaternionChannelChunk>())
 				{
 					if (quaternions.Param != "ROT") continue;
@@ -536,7 +536,7 @@ static class Program {
 					}
 				}
 				
-				// Find compressed ROT channels and apply rotation.
+				// Find compressed quaternion channels and apply rotation.
 				foreach (var quaternions in rootGroup.GetChunksOfType<CompressedQuaternionChannelChunk>())
 				{
 					if (quaternions.Param != "ROT") continue;
