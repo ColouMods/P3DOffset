@@ -112,6 +112,17 @@ static class Program {
 		{
 			switch (chunk)
 			{
+				// Camera (0x2200)
+				case CameraChunk camera:
+				{
+					camera.Position = Vector3.Transform(camera.Position, transform);
+					camera.Look = Vector3.Transform(camera.Look, transform);
+					camera.Up = Vector3.Transform(camera.Up, transform);
+					
+					OffsetAnimation(camera.Name);
+					break;
+				}
+				
 				// Old Billboard Quad Group (0x17002)
 				case OldBillboardQuadGroupChunk:
 				{
@@ -564,7 +575,7 @@ static class Program {
 	}
 	
 	// Animation (0x121000)
-	static void OffsetAnimation(string hierarchyName, string rootJointName, Chunk? rootChunk = null)
+	static void OffsetAnimation(string hierarchyName, string? rootJointName = null, Chunk? rootChunk = null)
 	{
 		// Find all Old Frame Controllers in root chunk. If root is null, find in file instead.
 		var controllers = rootChunk is null
@@ -582,40 +593,42 @@ static class Program {
 
 			foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
 			{
-				// Find animation group that corresponds to the root name.
-				var rootGroup = groupList.GetFirstChunkOfType<AnimationGroupChunk>(rootJointName);
-				if (rootGroup == null) continue;
-
-				// Find vector channels and apply transform.
-				foreach (var vectors in rootGroup.GetChunksOfType<Vector3DOFChannelChunk>())
+				foreach (var group in groupList.GetChunksOfType<AnimationGroupChunk>())
 				{
-					if (vectors.Param is not ("TRAN" or "LOOK" or "UP")) continue;
-
-					for (int i = 0; i < vectors.Values.Count; i++)
+					// If a root joint is specified, only affect the group that matches the root joint.
+					if (rootJointName != null && group.Name != rootJointName) continue;
+					
+					// Find vector channels and apply transform.
+					foreach (var vectors in group.GetChunksOfType<Vector3DOFChannelChunk>())
 					{
-						vectors.Values[i] = Vector3.Transform(vectors.Values[i], transform);
+						if (vectors.Param is not ("TRAN" or "LOOK" or "UP")) continue;
+
+						for (int i = 0; i < vectors.Values.Count; i++)
+						{
+							vectors.Values[i] = Vector3.Transform(vectors.Values[i], transform);
+						}
 					}
-				}
 
-				// Find quaternion channels and apply rotation.
-				foreach (var quaternions in rootGroup.GetChunksOfType<QuaternionChannelChunk>())
-				{
-					if (quaternions.Param != "ROT") continue;
-
-					for (int i = 0; i < quaternions.Values.Count; i++)
+					// Find quaternion channels and apply rotation.
+					foreach (var quaternions in group.GetChunksOfType<QuaternionChannelChunk>())
 					{
-						quaternions.Values[i] = rotQuat * quaternions.Values[i];
+						if (quaternions.Param != "ROT") continue;
+
+						for (int i = 0; i < quaternions.Values.Count; i++)
+						{
+							quaternions.Values[i] = rotQuat * quaternions.Values[i];
+						}
 					}
-				}
-				
-				// Find compressed quaternion channels and apply rotation.
-				foreach (var quaternions in rootGroup.GetChunksOfType<CompressedQuaternionChannelChunk>())
-				{
-					if (quaternions.Param != "ROT") continue;
 
-					for (int i = 0; i < quaternions.Values.Count; i++)
+					// Find compressed quaternion channels and apply rotation.
+					foreach (var quaternions in group.GetChunksOfType<CompressedQuaternionChannelChunk>())
 					{
-						quaternions.Values[i] = rotQuat * quaternions.Values[i];
+						if (quaternions.Param != "ROT") continue;
+
+						for (int i = 0; i < quaternions.Values.Count; i++)
+						{
+							quaternions.Values[i] = rotQuat * quaternions.Values[i];
+						}
 					}
 				}
 			}
