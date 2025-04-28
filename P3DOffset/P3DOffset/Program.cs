@@ -116,266 +116,269 @@ static class Program {
 		// Offset Chunks
 		foreach (var chunk in p3dFile.Chunks)
 		{
-			// Composite Drawable (0x4512)
-			if (chunk is CompositeDrawableChunk compositeDrawable)
+			switch (chunk)
 			{
-				if (drawables.Contains(compositeDrawable.Name))
+				// Composite Drawable (0x4512)
+				case CompositeDrawableChunk compositeDrawable:
 				{
-					OffsetDrawable(compositeDrawable, p3dFile);
-				}
-
-				continue;
-			}
-			
-			// Old Billboard Quad Group (0x17002)
-			if (chunk is OldBillboardQuadGroupChunk)
-			{
-				foreach (var billboard in chunk.GetChunksOfType<OldBillboardQuadChunk>())
-				{
-					billboard.Translation = Vector3.Transform(billboard.Translation, transform);
-				}
-				
-				continue;
-			}
-			
-			// Scenegraph (0x120100)
-			if (chunk is ScenegraphChunk scenegraphChunk)
-			{
-				if (scenegraphs.Contains(scenegraphChunk.Name))
-				{
-					OffsetScenegraph(scenegraphChunk);
-				}
-				
-				continue;
-			}
-			
-			// Road (0x3000003)
-			if (chunk is RoadChunk)
-			{
-				foreach (var roadSegment in chunk.GetChunksOfType<RoadSegmentChunk>())
-				{
-					roadSegment.Transform *= transform;
-				}
-				
-				continue;
-			}
-			
-			// Intersection (0x3000004)
-			if (chunk is IntersectionChunk intersection)
-			{
-				intersection.Position = Vector3.Transform(intersection.Position, transform);
-				continue;
-			}
-			
-			// Locator (0x3000005)
-			if (chunk is LocatorChunk locator)
-			{
-				locator.Position = Vector3.Transform(locator.Position, transform);
-
-				// Locator Type 3
-				if (locator.TypeData is LocatorChunk.Type3LocatorData type3Data)
-				{
-					var rot = type3Data.Rotation;
-					rot += (rotation.Y * deg2Rad);
-					type3Data.Rotation = LimitEulerAngle(rot, radians: true);
-				}
-				
-				// Locator Type 7
-				if (locator.TypeData is LocatorChunk.Type7LocatorData type7Data)
-				{
-					var vectors = OffsetLocatorMatrixList(type7Data.Right, type7Data.Up, type7Data.Front);
-
-					type7Data.Right = vectors.right;
-					type7Data.Up = vectors.up;
-					type7Data.Front = vectors.front;
-				}
-				
-				// Locator Type 8
-				if (locator.TypeData is LocatorChunk.Type8LocatorData type8Data)
-				{
-					var vectors = OffsetLocatorMatrixList(type8Data.Right, type8Data.Up, type8Data.Front);
-
-					type8Data.Right = vectors.right;
-					type8Data.Up = vectors.up;
-					type8Data.Front = vectors.front;
-				}
-				
-				// Locator Type 12
-				if (locator.TypeData is LocatorChunk.Type12LocatorData type12Data)
-				{
-					if (type12Data.FollowPlayer == 0)
+					if (drawables.Contains(compositeDrawable.Name))
 					{
-						type12Data.TargetPosition = Vector3.Transform(type12Data.TargetPosition, transform);
+						OffsetDrawable(compositeDrawable, p3dFile);
 					}
-				}
 
-				foreach (var trigger in locator.GetChunksOfType<TriggerVolumeChunk>())
-				{
-					trigger.Matrix *= transform;
+					break;
 				}
 				
-				foreach (var matrix in locator.GetChunksOfType<LocatorMatrixChunk>())
+				// Old Billboard Quad Group (0x17002)
+				case OldBillboardQuadGroupChunk:
 				{
-					matrix.Matrix *= transform;
-				}
-
-				foreach (var spline in locator.GetChunksOfType<SplineChunk>())
-				{
-					for (int i = 0; i < spline.Positions.Count; i++)
+					foreach (var billboard in chunk.GetChunksOfType<OldBillboardQuadChunk>())
 					{
-						spline.Positions[i] = Vector3.Transform(spline.Positions[i], transform);
+						billboard.Translation = Vector3.Transform(billboard.Translation, transform);
 					}
+				
+					break;
 				}
-
-				continue;
-			}
-			
-			// Path (0x300000B)
-			if (chunk is PathChunk path)
-			{
-				for (int i = 0; i < path.Positions.Count; i++)
+				
+				// Scenegraph (0x120100)
+				case ScenegraphChunk scenegraphChunk:
 				{
-					path.Positions[i] = Vector3.Transform(path.Positions[i], transform);
-				}
-
-				continue;
-			}
-			
-			// Static Entity (0x3F00000)
-			if (chunk is StaticEntityChunk)
-			{
-				foreach (var mesh in chunk.GetChunksOfType<MeshChunk>())
-				{
-					float? lowX = null, lowY = null, lowZ = null;
-					float? highX = null, highY = null, highZ = null;
-
-					foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
+					if (scenegraphs.Contains(scenegraphChunk.Name))
 					{
-						var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
-						if (positionList == null) continue;
+						OffsetScenegraph(scenegraphChunk);
+					}
+				
+					break;
+				}
+				
+				// Road (0x3000003)
+				case RoadChunk:
+				{
+					foreach (var roadSegment in chunk.GetChunksOfType<RoadSegmentChunk>())
+					{
+						roadSegment.Transform *= transform;
+					}
+				
+					break;
+				}
+				
+				// Intersection (0x3000004)
+				case IntersectionChunk intersection:
+				{
+					intersection.Position = Vector3.Transform(intersection.Position, transform);
+					break;
+				}
+				
+				// Locator (0x3000005)
+				case LocatorChunk locator:
+				{
+					locator.Position = Vector3.Transform(locator.Position, transform);
 
-						for (int i = 0; i < positionList.Positions.Count; i++)
+					// Locator Type 3
+					if (locator.TypeData is LocatorChunk.Type3LocatorData type3Data)
+					{
+						var rot = type3Data.Rotation;
+						rot += (rotation.Y * deg2Rad);
+						type3Data.Rotation = LimitEulerAngle(rot, radians: true);
+					}
+				
+					// Locator Type 7
+					if (locator.TypeData is LocatorChunk.Type7LocatorData type7Data)
+					{
+						var vectors = OffsetLocatorMatrixList(type7Data.Right, type7Data.Up, type7Data.Front);
+
+						type7Data.Right = vectors.right;
+						type7Data.Up = vectors.up;
+						type7Data.Front = vectors.front;
+					}
+				
+					// Locator Type 8
+					if (locator.TypeData is LocatorChunk.Type8LocatorData type8Data)
+					{
+						var vectors = OffsetLocatorMatrixList(type8Data.Right, type8Data.Up, type8Data.Front);
+
+						type8Data.Right = vectors.right;
+						type8Data.Up = vectors.up;
+						type8Data.Front = vectors.front;
+					}
+				
+					// Locator Type 12
+					if (locator.TypeData is LocatorChunk.Type12LocatorData type12Data)
+					{
+						if (type12Data.FollowPlayer == 0)
 						{
-							// Apply transform to each vertex position.
-							var pos = positionList.Positions[i];
-							var newPos = Vector3.Transform(pos, transform);
-							positionList.Positions[i] = newPos;
-
-							// Find min and max X, Y and Z values.
-							lowX = Math.Min(lowX ?? newPos.X,
-								newPos.X); // If lowX is null, newPos.X is substituted in instead.
-							lowY = Math.Min(lowY ?? newPos.Y, newPos.Y);
-							lowZ = Math.Min(lowZ ?? newPos.Z, newPos.Z);
-
-							highX = Math.Max(highX ?? newPos.X, newPos.X);
-							highY = Math.Max(highY ?? newPos.Y, newPos.Y);
-							highZ = Math.Max(highZ ?? newPos.Z, newPos.Z);
+							type12Data.TargetPosition = Vector3.Transform(type12Data.TargetPosition, transform);
 						}
 					}
 
-					// Set Bounding Box values.
-					var bbLow = new Vector3(lowX ?? 0, lowY ?? 0, lowZ ?? 0);
-					var bbHigh = new Vector3(highX ?? 0, highY ?? 0, highZ ?? 0);
-
-					var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
-
-					if (boundingBox != null)
+					foreach (var trigger in locator.GetChunksOfType<TriggerVolumeChunk>())
 					{
-						boundingBox.Low = bbLow;
-						boundingBox.High = bbHigh;
+						trigger.Matrix *= transform;
+					}
+				
+					foreach (var matrix in locator.GetChunksOfType<LocatorMatrixChunk>())
+					{
+						matrix.Matrix *= transform;
 					}
 
-					// Set Bounding Sphere values.
-					var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
-
-					if (boundingSphere != null)
+					foreach (var spline in locator.GetChunksOfType<SplineChunk>())
 					{
-						boundingSphere.Centre = new Vector3(
-							(bbLow.X + bbHigh.X) / 2,
-							(bbLow.Y + bbHigh.Y) / 2,
-							(bbLow.Z + bbHigh.Z) / 2);
+						for (int i = 0; i < spline.Positions.Count; i++)
+						{
+							spline.Positions[i] = Vector3.Transform(spline.Positions[i], transform);
+						}
+					}
 
-						// Find furthest away vertex from the bounding sphere centre.
-						float? maxDist = null;
+					break;
+				}
+				
+				// Path (0x300000B)
+				case PathChunk path:
+				{
+					for (int i = 0; i < path.Positions.Count; i++)
+					{
+						path.Positions[i] = Vector3.Transform(path.Positions[i], transform);
+					}
+
+					break;
+				}
+				
+				// Static Entity (0x3F00000)
+				case StaticEntityChunk:
+				{
+					foreach (var mesh in chunk.GetChunksOfType<MeshChunk>())
+					{
+						float? lowX = null, lowY = null, lowZ = null;
+						float? highX = null, highY = null, highZ = null;
+
 						foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
 						{
 							var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
 							if (positionList == null) continue;
 
-							foreach (var position in positionList.Positions)
+							for (int i = 0; i < positionList.Positions.Count; i++)
 							{
-								var dist = Vector3.Distance(position, boundingSphere.Centre);
-								maxDist = Math.Max(maxDist ?? dist, dist);
+								// Apply transform to each vertex position.
+								var pos = positionList.Positions[i];
+								var newPos = Vector3.Transform(pos, transform);
+								positionList.Positions[i] = newPos;
+
+								// Find min and max X, Y and Z values.
+								lowX = Math.Min(lowX ?? newPos.X,
+									newPos.X); // If lowX is null, newPos.X is substituted in instead.
+								lowY = Math.Min(lowY ?? newPos.Y, newPos.Y);
+								lowZ = Math.Min(lowZ ?? newPos.Z, newPos.Z);
+
+								highX = Math.Max(highX ?? newPos.X, newPos.X);
+								highY = Math.Max(highY ?? newPos.Y, newPos.Y);
+								highZ = Math.Max(highZ ?? newPos.Z, newPos.Z);
 							}
 						}
 
-						boundingSphere.Radius = maxDist ?? 0;
+						// Set Bounding Box values.
+						var bbLow = new Vector3(lowX ?? 0, lowY ?? 0, lowZ ?? 0);
+						var bbHigh = new Vector3(highX ?? 0, highY ?? 0, highZ ?? 0);
+
+						var boundingBox = mesh.GetFirstChunkOfType<BoundingBoxChunk>();
+
+						if (boundingBox != null)
+						{
+							boundingBox.Low = bbLow;
+							boundingBox.High = bbHigh;
+						}
+
+						// Set Bounding Sphere values.
+						var boundingSphere = mesh.GetFirstChunkOfType<BoundingSphereChunk>();
+
+						if (boundingSphere != null)
+						{
+							boundingSphere.Centre = new Vector3(
+								(bbLow.X + bbHigh.X) / 2,
+								(bbLow.Y + bbHigh.Y) / 2,
+								(bbLow.Z + bbHigh.Z) / 2);
+
+							// Find furthest away vertex from the bounding sphere centre.
+							float? maxDist = null;
+							foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
+							{
+								var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
+								if (positionList == null) continue;
+
+								foreach (var position in positionList.Positions)
+								{
+									var dist = Vector3.Distance(position, boundingSphere.Centre);
+									maxDist = Math.Max(maxDist ?? dist, dist);
+								}
+							}
+
+							boundingSphere.Radius = maxDist ?? 0;
+						}
 					}
+
+					break;
 				}
-
-				continue;
-			}
-
-			// Static Phys (0x3F00001)
-			if (chunk is StaticPhysChunk)
-			{
-				foreach (var collisionObject in chunk.GetChunksOfType<CollisionObjectChunk>())
+				
+				// Static Phys (0x3F00001)
+				case StaticPhysChunk:
 				{
-					OffsetCollisionVolumes(collisionObject);
-				}
-
-				continue;
-			}
-
-			// Dyna Phys (0x3F00002), Inst Stat Entity (0x3F00009), Inst Stat Phys (0x3F0000A), & Anim Dyna Phys (0x3F0000E)
-			if (chunk is DynaPhysChunk or InstStatEntityChunk or InstStatPhysChunk or AnimDynaPhysChunk)
-			{
-				foreach (var instanceList in chunk.GetChunksOfType<InstanceListChunk>())
-				{
-					foreach (var scenegraph in instanceList.GetChunksOfType<ScenegraphChunk>())
+					foreach (var collisionObject in chunk.GetChunksOfType<CollisionObjectChunk>())
 					{
-						OffsetScenegraph(scenegraph);
+						OffsetCollisionVolumes(collisionObject);
 					}
-				}
 
-				continue;
-			}
-			
-			// Fence (0x3F00007)
-			if (chunk is FenceChunk)
-			{
-				foreach (var wall in chunk.GetChunksOfType<WallChunk>())
+					break;
+				}
+				
+				// Dyna Phys (0x3F00002), Inst Stat Entity (0x3F00009), Inst Stat Phys (0x3F0000A), & Anim Dyna Phys (0x3F0000E)
+				case DynaPhysChunk or InstStatEntityChunk or InstStatPhysChunk or AnimDynaPhysChunk:
 				{
-					// Calculate normal from original start/end positions.
-					var calcNormal = CalculateFenceNormal(wall.Start, wall.End, false);
+					foreach (var instanceList in chunk.GetChunksOfType<InstanceListChunk>())
+					{
+						foreach (var scenegraph in instanceList.GetChunksOfType<ScenegraphChunk>())
+						{
+							OffsetScenegraph(scenegraph);
+						}
+					}
 
-					// Check whether it matches the original normal, if not assume it's inverted.
-					float tolerance = 0.001f;
-					bool inverted = Math.Abs(wall.Normal.X - calcNormal.X) > tolerance;
-					
-					// Calculate new start/end positions.
-					var newStart = Vector3.Transform(wall.Start, transform);
-					wall.Start = new Vector3(newStart.X, 0, newStart.Z);
-					
-					var newEnd = Vector3.Transform(wall.End, transform);
-					wall.End = new Vector3(newEnd.X, 0, newEnd.Z);
-
-					// Calculate normal from new start/end positions.
-					wall.Normal = CalculateFenceNormal(wall.Start, wall.End, inverted);
+					break;
 				}
-
-				continue;
-			}
-			
-			// Anim Coll (0x3F00008) & Anim (0x3F0000C)
-			if (chunk is AnimCollChunk or AnimChunk)
-			{
-				foreach (var drawable in chunk.GetChunksOfType<CompositeDrawableChunk>())
+				
+				// Fence (0x3F00007)
+				case FenceChunk:
 				{
-					OffsetDrawable(drawable, p3dFile, chunk);
-				}
+					foreach (var wall in chunk.GetChunksOfType<WallChunk>())
+					{
+						// Calculate normal from original start/end positions.
+						var calcNormal = CalculateFenceNormal(wall.Start, wall.End, false);
 
-				continue;
+						// Check whether it matches the original normal, if not assume it's inverted.
+						float tolerance = 0.001f;
+						bool inverted = Math.Abs(wall.Normal.X - calcNormal.X) > tolerance;
+					
+						// Calculate new start/end positions.
+						var newStart = Vector3.Transform(wall.Start, transform);
+						wall.Start = new Vector3(newStart.X, 0, newStart.Z);
+					
+						var newEnd = Vector3.Transform(wall.End, transform);
+						wall.End = new Vector3(newEnd.X, 0, newEnd.Z);
+
+						// Calculate normal from new start/end positions.
+						wall.Normal = CalculateFenceNormal(wall.Start, wall.End, inverted);
+					}
+
+					break;
+				}
+				
+				// Anim Coll (0x3F00008) & Anim (0x3F0000C)
+				case AnimCollChunk or AnimChunk:
+				{
+					foreach (var drawable in chunk.GetChunksOfType<CompositeDrawableChunk>())
+					{
+						OffsetDrawable(drawable, p3dFile, chunk);
+					}
+
+					break;
+				}
 			}
 		}
 
