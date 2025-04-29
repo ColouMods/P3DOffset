@@ -17,7 +17,7 @@ static class Program {
 	static Quaternion rotQuat;
 	
 	static P3DFile p3dFile = new();
-	static List<string> usedDrawables = new();
+	static List<string> drawablesToSkip = new();
 
 	public static void Main(string[] args)
 	{
@@ -139,29 +139,7 @@ static class Program {
 					{
 						foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
 						{
-							foreach (var scenegraphTransform in scenegraphBranch.GetChunksOfType<OldScenegraphTransformChunk>())
-							{
-								scenegraphTransform.Transform *= transform;
-							}
-
-							foreach (var scenegraphDrawable in scenegraphBranch.GetChunksOfType<OldScenegraphDrawableChunk>())
-							{
-								// If a drawable isn't within a transform, it needs to be offset directly.
-								// Drawables can be either Composite Drawables or Meshes, so need to figure out which one it is first.
-								var compositeDrawable = p3dFile.GetFirstChunkOfType<CompositeDrawableChunk>(scenegraphDrawable.DrawableName);
-								if (compositeDrawable != null)
-								{
-									usedDrawables.Add(compositeDrawable.Name);
-									OffsetDrawable(compositeDrawable);
-									continue;
-								}
-								
-								var mesh = p3dFile.GetFirstChunkOfType<MeshChunk>(scenegraphDrawable.DrawableName);
-								if (mesh != null)
-								{
-									OffsetMeshOrSkin(mesh);
-								}
-							}
+							OffsetScenegraphChunks(scenegraphBranch, isRoot: true);
 						}
 					}
 				
@@ -375,7 +353,7 @@ static class Program {
 		// Composite Drawable (0x4512)
 		foreach (var drawable in p3dFile.GetChunksOfType<CompositeDrawableChunk>())
 		{
-			if (!usedDrawables.Contains(drawable.Name))
+			if (!drawablesToSkip.Contains(drawable.Name))
 			{
 				OffsetDrawable(drawable);
 			}
@@ -578,6 +556,61 @@ static class Program {
 			}
 
 			boundingSphere.Radius = maxDist ?? 0;
+		}
+	}
+	
+	// Old Scenegraph Transform (0x120103) & Old Scenegraph Drawable (0x120107)
+	static void OffsetScenegraphChunks(Chunk rootChunk, bool isRoot = false)
+	{
+		foreach (var chunk in rootChunk.Children)
+		{
+			switch (chunk)
+			{
+				case OldScenegraphTransformChunk scenegraphTransform:
+				{
+					if (isRoot)
+					{
+						scenegraphTransform.Transform *= transform;
+					}
+					
+					OffsetScenegraphChunks(chunk);
+					break;
+				}
+
+				case OldScenegraphVisibilityChunk:
+				{
+					OffsetScenegraphChunks(chunk, isRoot);
+					break;
+				}
+				
+				case OldScenegraphDrawableChunk scenegraphDrawable:
+				{
+					// Make sure this drawable hasn't already been offset.
+					var name = scenegraphDrawable.DrawableName;
+					if (drawablesToSkip.Contains(name)) break;
+					
+					// Drawables can be either Composite Drawables or Meshes, so need to try and get both.
+					var compositeDrawable = p3dFile.GetFirstChunkOfType<CompositeDrawableChunk>(scenegraphDrawable.DrawableName);
+					var mesh = p3dFile.GetFirstChunkOfType<MeshChunk>(scenegraphDrawable.DrawableName);
+
+					if (compositeDrawable != null)
+					{
+						drawablesToSkip.Add(compositeDrawable.Name);
+						if (!isRoot) break;
+						
+						OffsetDrawable(compositeDrawable);
+					}
+					else if (mesh != null)
+					{
+						drawablesToSkip.Add(mesh.Name);
+						if (!isRoot) break;
+						
+						OffsetMeshOrSkin(mesh);
+					}
+					
+					break;
+				}
+			}
 		}
 	}
 	
