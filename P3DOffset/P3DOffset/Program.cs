@@ -5,24 +5,22 @@ using NetP3DLib.P3D.Chunks;
 namespace P3DOffset;
 
 static class Program {
-	// Set constants.
 	const float deg2Rad = MathF.PI / 180;
-
-	// Initialise static variables.
-	static P3DFile p3dFile = new P3DFile();
-	static Vector3 translation = new Vector3(0, 0, 0);
-	static Vector3 rotation = new Vector3(0, 0, 0);
+	
+	static string inputPath = string.Empty;
+	static string outputPath = string.Empty;
+	static bool forceOverwrite = false;
+	
+	static Vector3 translation = new(0, 0, 0);
+	static Vector3 rotation = new(0, 0, 0);
 	static Matrix4x4 transform;
 	static Quaternion rotQuat;
+	
+	static P3DFile p3dFile = new();
+	static List<string> usedDrawables = new();
 
 	public static void Main(string[] args)
 	{
-		// Initialise variables.
-		var inputPath = string.Empty;
-		var outputPath = string.Empty;
-		var forceOverwrite = false;
-		var usedDrawables = new List<string>();
-		
 		// Check whether arguments have been passed.
 		if (args.Length == 0)
 		{
