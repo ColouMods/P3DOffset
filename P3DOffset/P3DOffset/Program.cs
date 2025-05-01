@@ -330,9 +330,27 @@ static class Program {
 				{
 					foreach (var drawable in chunk.GetChunksOfType<CompositeDrawableChunk>())
 					{
-						OffsetDrawable(drawable, chunk);
+						OffsetDrawable(drawable, parent: chunk);
 					}
 
+					break;
+				}
+				
+				// World Sphere (0x3F0000B)
+				case WorldSphereChunk:
+				{
+					foreach (var drawable in chunk.GetChunksOfType<CompositeDrawableChunk>())
+					{
+						OffsetDrawable(drawable, hierarchyParent: chunk, parent: chunk);
+					}
+
+					foreach (var lensFlare in chunk.GetChunksOfType<LensFlareChunk>())
+					{
+						foreach (var drawable in lensFlare.GetChunksOfType<CompositeDrawableChunk>())
+						{
+							OffsetDrawable(drawable, hierarchyParent: chunk, parent: lensFlare);
+						}
+					}
 					break;
 				}
 			}
@@ -488,7 +506,7 @@ static class Program {
 
 	// Offset Chunk Methods //
 	// Composite Drawable (0x4512)
-	static void OffsetDrawable(CompositeDrawableChunk drawable, Chunk? rootChunk = null)
+	static void OffsetDrawable(CompositeDrawableChunk drawable, Chunk? hierarchyParent = null, Chunk? parent = null)
 	{
 		// Find skin chunks used by the Composite Drawable.
 		foreach (var skinList in drawable.GetChunksOfType<CompositeDrawableSkinListChunk>())
@@ -496,25 +514,34 @@ static class Program {
 			foreach (var drawableSkin in skinList.GetChunksOfType<CompositeDrawableSkinChunk>())
 			{
 				// Find & offset skin referenced by the Composite Drawable Skin.
-				var skin = p3dFile.GetFirstChunkOfType<SkinChunk>(drawableSkin.Name);
-				if (skin == null) continue;
+				// If hierarchy parent is null find in file, else find in parent.
+				var skin = hierarchyParent is null
+					? p3dFile.GetFirstChunkOfType<SkinChunk>(drawableSkin.Name)
+					: hierarchyParent.GetFirstChunkOfType<SkinChunk>(drawableSkin.Name);
+
+				if (skin == null)
+					continue;
 				OffsetMeshOrSkin(skin);
 			}
 		}
 		
 		// Find skeleton referenced by the Composite Drawable.
 		var skeletonName = drawable.SkeletonName;
-
-		var skeleton = p3dFile.GetFirstChunkOfType<SkeletonChunk>(skeletonName);
-		if (skeleton == null) return;
+		var skeleton = hierarchyParent is null
+			? p3dFile.GetFirstChunkOfType<SkeletonChunk>(skeletonName)
+			: hierarchyParent.GetFirstChunkOfType<SkeletonChunk>(skeletonName);
+		
+		if (skeleton == null)
+			return;
 
 		// Find root joint of the skeleton and apply transform.
 		var rootJoint = skeleton.GetFirstChunkOfType<SkeletonJointChunk>();
-		if (rootJoint == null) return;
+		if (rootJoint == null)
+			return;
 		
 		rootJoint.RestPose *= transform;
 		
-		OffsetAnimation(skeleton.Name, rootJoint.Name, rootChunk);
+		OffsetAnimation(skeleton.Name, rootJoint.Name, hierarchyParent, parent);
 	}
 	
 	// Mesh (0x10000) & Skin (0x10001)
@@ -653,12 +680,12 @@ static class Program {
 	}
 	
 	// Animation (0x121000)
-	static void OffsetAnimation(string hierarchyName, string? rootJointName = null, Chunk? rootChunk = null)
+	static void OffsetAnimation(string hierarchyName, string? rootJointName = null, Chunk? hierarchyParent = null, Chunk? parent = null)
 	{
-		// Find all Old Frame Controllers in root chunk. If root is null, find in file instead.
-		var controllers = rootChunk is null
+		// Find all Old Frame Controllers in parent chunk. If parent is null, find in file instead.
+		var controllers = parent is null
 			? p3dFile.GetChunksOfType<OldFrameControllerChunk>()
-			: rootChunk.GetChunksOfType<OldFrameControllerChunk>();
+			: parent.GetChunksOfType<OldFrameControllerChunk>();
 		
 		foreach (var controller in controllers)
 		{
@@ -667,7 +694,11 @@ static class Program {
 				continue;
 
 			// Find animation chunk referenced by the frame controller.
-			var animation = p3dFile.GetFirstChunkOfType<AnimationChunk>(controller.AnimationName);
+			// If hierarchy parent is null find in file, else find in parent.
+			var animation = parent is null
+				? p3dFile.GetFirstChunkOfType<AnimationChunk>(controller.AnimationName)
+				: parent.GetFirstChunkOfType<AnimationChunk>(controller.AnimationName);
+
 			if (animation == null)
 				continue;
 
