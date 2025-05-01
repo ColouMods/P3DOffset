@@ -580,7 +580,7 @@ static class Program {
 
 				case OldScenegraphVisibilityChunk:
 				{
-					OffsetScenegraphChunks(chunk, isRoot);
+					OffsetScenegraphChunks(chunk, isRoot, rootName);
 					break;
 				}
 				
