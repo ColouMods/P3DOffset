@@ -139,7 +139,7 @@ static class Program {
 					{
 						foreach (var scenegraphBranch in scenegraphRoot.GetChunksOfType<OldScenegraphBranchChunk>())
 						{
-							OffsetScenegraphChunks(scenegraphBranch, isRoot: true);
+							OffsetScenegraphChunks(scenegraphBranch, isRoot: true, rootName: scenegraph.Name);
 						}
 					}
 				
@@ -560,7 +560,7 @@ static class Program {
 	}
 	
 	// Old Scenegraph Transform (0x120103) & Old Scenegraph Drawable (0x120107)
-	static void OffsetScenegraphChunks(Chunk rootChunk, bool isRoot = false)
+	static void OffsetScenegraphChunks(Chunk rootChunk, bool isRoot = false, string rootName = "")
 	{
 		foreach (var chunk in rootChunk.Children)
 		{
@@ -571,6 +571,7 @@ static class Program {
 					if (isRoot)
 					{
 						scenegraphTransform.Transform *= transform;
+						OffsetAnimation(rootName, scenegraphTransform.Name);
 					}
 					
 					OffsetScenegraphChunks(chunk);
@@ -587,7 +588,8 @@ static class Program {
 				{
 					// Make sure this drawable hasn't already been offset.
 					var name = scenegraphDrawable.DrawableName;
-					if (drawablesToSkip.Contains(name)) break;
+					if (drawablesToSkip.Contains(name))
+						break;
 					
 					// Drawables can be either Composite Drawables or Meshes, so need to try and get both.
 					var compositeDrawable = p3dFile.GetFirstChunkOfType<CompositeDrawableChunk>(scenegraphDrawable.DrawableName);
@@ -596,14 +598,16 @@ static class Program {
 					if (compositeDrawable != null)
 					{
 						drawablesToSkip.Add(compositeDrawable.Name);
-						if (!isRoot) break;
+						if (!isRoot)
+							break;
 						
 						OffsetDrawable(compositeDrawable);
 					}
 					else if (mesh != null)
 					{
 						drawablesToSkip.Add(mesh.Name);
-						if (!isRoot) break;
+						if (!isRoot)
+							break;
 						
 						OffsetMeshOrSkin(mesh);
 					}
