@@ -625,49 +625,96 @@ static class Program {
 		foreach (var controller in controllers)
 		{
 			// Check if frame controller references hierarchy name.
-			if (controller.HierarchyName != hierarchyName) continue;
+			if (controller.HierarchyName != hierarchyName)
+				continue;
 
 			// Find animation chunk referenced by the frame controller.
 			var animation = p3dFile.GetFirstChunkOfType<AnimationChunk>(controller.AnimationName);
-			if (animation == null) continue;
+			if (animation == null)
+				continue;
 
 			foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
 			{
 				foreach (var group in groupList.GetChunksOfType<AnimationGroupChunk>())
 				{
 					// If a root joint is specified, only affect the group that matches the root joint.
-					if (rootJointName != null && group.Name != rootJointName) continue;
+					if (rootJointName != null && group.Name != rootJointName)
+						continue;
 					
-					// Find vector channels and apply transform.
-					foreach (var vectors in group.GetChunksOfType<Vector3DOFChannelChunk>())
+					// Convert 1D and 2D vector channels to 3D vectors.
+					for (var i = 0; i < group.Children.Count; i++)
 					{
-						if (vectors.Param is not ("TRAN" or "LOOK" or "UP")) continue;
-
-						for (int i = 0; i < vectors.Values.Count; i++)
+						switch (group.Children[i])
 						{
-							vectors.Values[i] = Vector3.Transform(vectors.Values[i], transform);
+							case Vector1DOFChannelChunk vector1D:
+							{
+								if (vector1D.Param is not ("TRAN" or "LOOK" or "UP"))
+									continue;
+								
+								// Get 3D vectors from 1D channel.
+								var vectorList = vector1D.GetValues();
+
+								// Create new 3D vector channel.
+								var vector3D = new Vector3DOFChannelChunk(vector1D.Version, vector1D.Param, vector1D.Frames, vectorList);
+								vector3D.Children.AddRange(vector1D.Children);
+
+								// Replace 1D channel with 3D channel.
+								group.Children[i] = vector3D;
+								break;
+							}
+							
+							case Vector2DOFChannelChunk vector2D:
+							{
+								if (vector2D.Param is not ("TRAN" or "LOOK" or "UP"))
+									continue;
+								
+								// Get 3D vectors from 2D channel & apply transform.
+								var vectorList = vector2D.GetValues();
+
+								// Create new 3D vector channel.
+								var vector3D = new Vector3DOFChannelChunk(vector2D.Version, vector2D.Param, vector2D.Frames, vectorList);
+								vector3D.Children.AddRange(vector2D.Children);
+
+								// Replace 2D channel with 3D channel.
+								group.Children[i] = vector3D;
+								break;
+							}
+						}
+					}
+					
+					// Find 3D vector channels and apply transform.
+					foreach (var vector in group.GetChunksOfType<Vector3DOFChannelChunk>())
+					{
+						if (vector.Param is not ("TRAN" or "LOOK" or "UP"))
+							continue;
+
+						for (int i = 0; i < vector.Values.Count; i++)
+						{
+							vector.Values[i] = Vector3.Transform(vector.Values[i], transform);
 						}
 					}
 
 					// Find quaternion channels and apply rotation.
-					foreach (var quaternions in group.GetChunksOfType<QuaternionChannelChunk>())
+					foreach (var quaternion in group.GetChunksOfType<QuaternionChannelChunk>())
 					{
-						if (quaternions.Param != "ROT") continue;
+						if (quaternion.Param is not "ROT")
+							continue;
 
-						for (int i = 0; i < quaternions.Values.Count; i++)
+						for (int i = 0; i < quaternion.Values.Count; i++)
 						{
-							quaternions.Values[i] = rotQuat * quaternions.Values[i];
+							quaternion.Values[i] = rotQuat * quaternion.Values[i];
 						}
 					}
 
 					// Find compressed quaternion channels and apply rotation.
-					foreach (var quaternions in group.GetChunksOfType<CompressedQuaternionChannelChunk>())
+					foreach (var quaternion in group.GetChunksOfType<CompressedQuaternionChannelChunk>())
 					{
-						if (quaternions.Param != "ROT") continue;
+						if (quaternion.Param is not "ROT")
+							continue;
 
-						for (int i = 0; i < quaternions.Values.Count; i++)
+						for (int i = 0; i < quaternion.Values.Count; i++)
 						{
-							quaternions.Values[i] = rotQuat * quaternions.Values[i];
+							quaternion.Values[i] = rotQuat * quaternion.Values[i];
 						}
 					}
 				}
