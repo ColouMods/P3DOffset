@@ -18,6 +18,7 @@ static class Program {
 	
 	static P3DFile p3dFile = new();
 	static List<string> drawablesToSkip = new();
+	static List<string> lightGroupsToSkip = new();
 
 	public static void Main(string[] args)
 	{
@@ -337,6 +338,42 @@ static class Program {
 			}
 		}
 
+		// These chunks need to be handled after the rest of the file.
+		
+		// Light Group (0x2380)
+		foreach (var lightGroup in p3dFile.GetChunksOfType<LightGroupChunk>())
+		{
+			// Light Groups are seemingly relative to the camera (or something) in Scenegraphs.
+			// So if the Light Group is used by a Scenegraph then it should be skipped.
+			if (lightGroupsToSkip.Contains(lightGroup.Name))
+				continue;
+			
+			foreach (var lightName in lightGroup.Lights)
+			{
+				var light = p3dFile.GetFirstChunkOfType<LightChunk>(lightName);
+				if (light == null)
+					continue;
+				
+				foreach (var position in light.GetChunksOfType<LightPositionChunk>())
+				{
+					position.Position = Vector3.Transform(position.Position, transform);
+				}
+
+				foreach (var direction in light.GetChunksOfType<LightDirectionChunk>())
+				{
+					direction.Direction = Vector3.Transform(direction.Direction, transform);
+				}
+			}
+		}
+		
+		// Composite Drawable (0x4512)
+		foreach (var drawable in p3dFile.GetChunksOfType<CompositeDrawableChunk>())
+		{
+			if (drawablesToSkip.Contains(drawable.Name))
+				continue;
+			OffsetDrawable(drawable);
+		}
+		
 		// Check if output file already exists.
 		if (!forceOverwrite && File.Exists(outputPath))
 		{
@@ -347,15 +384,6 @@ static class Program {
 			{
 				Console.WriteLine("Error: File could not be written.");
 				Environment.Exit(5);
-			}
-		}
-
-		// Composite Drawable (0x4512)
-		foreach (var drawable in p3dFile.GetChunksOfType<CompositeDrawableChunk>())
-		{
-			if (!drawablesToSkip.Contains(drawable.Name))
-			{
-				OffsetDrawable(drawable);
 			}
 		}
 
@@ -566,24 +594,6 @@ static class Program {
 		{
 			switch (chunk)
 			{
-				case OldScenegraphTransformChunk scenegraphTransform:
-				{
-					if (isRoot)
-					{
-						scenegraphTransform.Transform *= transform;
-						OffsetAnimation(rootName, scenegraphTransform.Name);
-					}
-					
-					OffsetScenegraphChunks(chunk);
-					break;
-				}
-
-				case OldScenegraphVisibilityChunk:
-				{
-					OffsetScenegraphChunks(chunk, isRoot, rootName);
-					break;
-				}
-				
 				case OldScenegraphDrawableChunk scenegraphDrawable:
 				{
 					// Make sure this drawable hasn't already been offset.
@@ -592,8 +602,8 @@ static class Program {
 						break;
 					
 					// Drawables can be either Composite Drawables or Meshes, so need to try and get both.
-					var compositeDrawable = p3dFile.GetFirstChunkOfType<CompositeDrawableChunk>(scenegraphDrawable.DrawableName);
-					var mesh = p3dFile.GetFirstChunkOfType<MeshChunk>(scenegraphDrawable.DrawableName);
+					var compositeDrawable = p3dFile.GetFirstChunkOfType<CompositeDrawableChunk>(name);
+					var mesh = p3dFile.GetFirstChunkOfType<MeshChunk>(name);
 
 					if (compositeDrawable != null)
 					{
@@ -612,6 +622,30 @@ static class Program {
 						OffsetMeshOrSkin(mesh);
 					}
 					
+					break;
+				}
+
+				case OldScenegraphLightGroupChunk scenegraphLightGroup:
+				{
+					lightGroupsToSkip.Add(scenegraphLightGroup.LightGroupName);
+					break;
+				}
+				
+				case OldScenegraphTransformChunk scenegraphTransform:
+				{
+					if (isRoot)
+					{
+						scenegraphTransform.Transform *= transform;
+						OffsetAnimation(rootName, scenegraphTransform.Name);
+					}
+					
+					OffsetScenegraphChunks(chunk);
+					break;
+				}
+
+				case OldScenegraphVisibilityChunk:
+				{
+					OffsetScenegraphChunks(chunk, isRoot, rootName);
 					break;
 				}
 			}
