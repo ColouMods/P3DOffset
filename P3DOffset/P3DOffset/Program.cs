@@ -364,13 +364,17 @@ static class Program {
 			// Light Groups are seemingly relative to the camera (or something) in Scenegraphs.
 			// So if the Light Group is used by a Scenegraph then it should be skipped.
 			if (lightGroupsToSkip.Contains(lightGroup.Name))
+			{
 				continue;
+			}
 			
 			foreach (var lightName in lightGroup.Lights)
 			{
 				var light = p3dFile.GetFirstChunkOfType<LightChunk>(lightName);
 				if (light == null)
+				{
 					continue;
+				}
 				
 				foreach (var position in light.GetChunksOfType<LightPositionChunk>())
 				{
@@ -388,7 +392,10 @@ static class Program {
 		foreach (var drawable in p3dFile.GetChunksOfType<CompositeDrawableChunk>())
 		{
 			if (drawablesToSkip.Contains(drawable.Name))
+			{
 				continue;
+			}
+			
 			OffsetDrawable(drawable);
 		}
 		
@@ -520,7 +527,9 @@ static class Program {
 					: hierarchyParent.GetFirstChunkOfType<SkinChunk>(drawableSkin.Name);
 
 				if (skin == null)
+				{
 					continue;
+				}
 				OffsetMeshOrSkin(skin);
 			}
 		}
@@ -532,12 +541,16 @@ static class Program {
 			: hierarchyParent.GetFirstChunkOfType<SkeletonChunk>(skeletonName);
 		
 		if (skeleton == null)
+		{
 			return;
+		}
 
 		// Find root joint of the skeleton and apply transform.
 		var rootJoint = skeleton.GetFirstChunkOfType<SkeletonJointChunk>();
 		if (rootJoint == null)
+		{
 			return;
+		}
 		
 		rootJoint.RestPose *= transform;
 		
@@ -553,7 +566,10 @@ static class Program {
 		foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
 		{
 			var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
-			if (positionList == null) continue;
+			if (positionList == null)
+			{
+				continue;
+			}
 
 			for (int i = 0; i < positionList.Positions.Count; i++)
 			{
@@ -601,7 +617,10 @@ static class Program {
 			foreach (var primitiveGroup in mesh.GetChunksOfType<OldPrimitiveGroupChunk>())
 			{
 				var positionList = primitiveGroup.GetFirstChunkOfType<PositionListChunk>();
-				if (positionList == null) continue;
+				if (positionList == null)
+				{
+					continue;
+				}
 
 				foreach (var position in positionList.Positions)
 				{
@@ -626,7 +645,9 @@ static class Program {
 					// Make sure this drawable hasn't already been offset.
 					var name = scenegraphDrawable.DrawableName;
 					if (drawablesToSkip.Contains(name))
+					{
 						break;
+					}
 					
 					// Drawables can be either Composite Drawables or Meshes, so need to try and get both.
 					var compositeDrawable = p3dFile.GetFirstChunkOfType<CompositeDrawableChunk>(name);
@@ -635,16 +656,22 @@ static class Program {
 					if (compositeDrawable != null)
 					{
 						drawablesToSkip.Add(compositeDrawable.Name);
+						
 						if (!isRoot)
+						{
 							break;
+						}
 						
 						OffsetDrawable(compositeDrawable);
 					}
 					else if (mesh != null)
 					{
 						drawablesToSkip.Add(mesh.Name);
+						
 						if (!isRoot)
+						{
 							break;
+						}
 						
 						OffsetMeshOrSkin(mesh);
 					}
@@ -691,7 +718,9 @@ static class Program {
 		{
 			// Check if frame controller references hierarchy name.
 			if (controller.HierarchyName != hierarchyName)
+			{
 				continue;
+			}
 
 			// Find animation chunk referenced by the frame controller.
 			// If hierarchy parent is null find in file, else find in parent.
@@ -700,7 +729,9 @@ static class Program {
 				: parent.GetFirstChunkOfType<AnimationChunk>(controller.AnimationName);
 
 			if (animation == null)
+			{
 				continue;
+			}
 
 			foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
 			{
@@ -708,7 +739,9 @@ static class Program {
 				{
 					// If a root joint is specified, only affect the group that matches the root joint.
 					if (rootJointName != null && group.Name != rootJointName)
+					{
 						continue;
+					}
 					
 					// Convert 1D and 2D vector channels to 3D vectors.
 					for (var i = 0; i < group.Children.Count; i++)
@@ -718,7 +751,9 @@ static class Program {
 							case Vector1DOFChannelChunk vector1D:
 							{
 								if (vector1D.Param is not ("TRAN" or "LOOK" or "UP"))
+								{
 									continue;
+								}
 								
 								// Get 3D vectors from 1D channel.
 								var vectorList = vector1D.GetValues();
@@ -735,7 +770,9 @@ static class Program {
 							case Vector2DOFChannelChunk vector2D:
 							{
 								if (vector2D.Param is not ("TRAN" or "LOOK" or "UP"))
+								{
 									continue;
+								}
 								
 								// Get 3D vectors from 2D channel & apply transform.
 								var vectorList = vector2D.GetValues();
@@ -755,7 +792,9 @@ static class Program {
 					foreach (var vector in group.GetChunksOfType<Vector3DOFChannelChunk>())
 					{
 						if (vector.Param is not ("TRAN" or "LOOK" or "UP"))
+						{
 							continue;
+						}
 
 						for (int i = 0; i < vector.Values.Count; i++)
 						{
@@ -767,7 +806,9 @@ static class Program {
 					foreach (var quaternion in group.GetChunksOfType<QuaternionChannelChunk>())
 					{
 						if (quaternion.Param is not "ROT")
+						{
 							continue;
+						}
 
 						for (int i = 0; i < quaternion.Values.Count; i++)
 						{
@@ -779,7 +820,9 @@ static class Program {
 					foreach (var quaternion in group.GetChunksOfType<CompressedQuaternionChannelChunk>())
 					{
 						if (quaternion.Param is not "ROT")
+						{
 							continue;
+						}
 
 						for (int i = 0; i < quaternion.Values.Count; i++)
 						{
@@ -820,7 +863,11 @@ static class Program {
 			foreach (var collisionBox in collisionVolume.GetChunksOfType<CollisionOrientedBoundingBoxChunk>())
 			{
 				var vectors = collisionBox.GetChunksOfType<CollisionVectorChunk>();
-				if (vectors.Length != 4) continue;
+			
+				if (vectors.Length != 4)
+				{
+					continue;
+				}
 				
 				// Construct matrix from vectors.
 				var boxRot = new Matrix4x4(vectors[1].Vector.X, vectors[1].Vector.Y, vectors[1].Vector.Z, 0,
@@ -841,7 +888,11 @@ static class Program {
 			foreach (var collisionCylinder in collisionVolume.GetChunksOfType<CollisionCylinderChunk>())
 			{
 				var vectors = collisionCylinder.GetChunksOfType<CollisionVectorChunk>();
-				if (vectors.Length != 2) continue;
+				
+				if (vectors.Length != 2)
+				{
+					continue;
+				}
 				
 				// Apply transform to centre vector.
 				vectors[0].Vector = Vector3.Transform(vectors[0].Vector, transform);
@@ -861,7 +912,11 @@ static class Program {
 			foreach (var collisionSphere in collisionVolume.GetChunksOfType<CollisionSphereChunk>())
 			{
 				var vectorCentre = collisionSphere.GetFirstChunkOfType<CollisionVectorChunk>();
-				if (vectorCentre == null) continue;
+			
+				if (vectorCentre == null)
+				{
+					continue;
+				}
 				
 				vectorCentre.Vector = Vector3.Transform(vectorCentre.Vector, transform);
 			}
