@@ -223,22 +223,22 @@ static class Program {
 						// Locator Type 7
 						case LocatorChunk.Type7LocatorData type7Data:
 						{
-							var vectors = OffsetLocatorMatrixList(type7Data.Right, type7Data.Up, type7Data.Front);
+							var (right, up, front) = OffsetLocatorMatrixList(type7Data.Right, type7Data.Up, type7Data.Front);
 
-							type7Data.Right = vectors.right;
-							type7Data.Up = vectors.up;
-							type7Data.Front = vectors.front;
+							type7Data.Right = right;
+							type7Data.Up = up;
+							type7Data.Front = front;
 							break;
 						}
 						
 						// Locator Type 8
 						case LocatorChunk.Type8LocatorData type8Data:
 						{
-							var vectors = OffsetLocatorMatrixList(type8Data.Right, type8Data.Up, type8Data.Front);
+							var (right, up, front) = OffsetLocatorMatrixList(type8Data.Right, type8Data.Up, type8Data.Front);
 
-							type8Data.Right = vectors.right;
-							type8Data.Up = vectors.up;
-							type8Data.Front = vectors.front;
+							type8Data.Right = right;
+							type8Data.Up = up;
+							type8Data.Front = front;
 							break;
 						}
 						
