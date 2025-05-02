@@ -781,6 +781,8 @@ static class Program {
 			{
 				continue;
 			}
+			
+			var deleteSize = false;
 
 			foreach (var groupList in animation.GetChunksOfType<AnimationGroupListChunk>())
 			{
@@ -813,6 +815,8 @@ static class Program {
 
 								// Replace 1D channel with 3D channel.
 								group.Children[i] = vector3D;
+
+								deleteSize = true;
 								break;
 							}
 							
@@ -832,6 +836,8 @@ static class Program {
 
 								// Replace 2D channel with 3D channel.
 								group.Children[i] = vector3D;
+								
+								deleteSize = true;
 								break;
 							}
 						}
@@ -881,6 +887,15 @@ static class Program {
 					}
 				}
 			}
+
+			// If you change the size of any animation channels, you need to also delete the Animation Size chunk.
+			// Otherwise, the game gets very unhappy (aka it crashes randomly).
+			if (deleteSize)
+			{
+				AnimationSizeChunk size;
+				while ((size = animation.GetFirstChunkOfType<AnimationSizeChunk>()) != null)
+				{
+					animation.Children.Remove(size);
 		}
 	}
 	
