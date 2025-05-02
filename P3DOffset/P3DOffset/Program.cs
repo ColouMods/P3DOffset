@@ -200,49 +200,57 @@ static class Program {
 				{
 					locator.Position = Vector3.Transform(locator.Position, transform);
 
-					// Locator Type 3
-					if (locator.TypeData is LocatorChunk.Type3LocatorData type3Data)
+					switch (locator.TypeData)
 					{
-						var rot = type3Data.Rotation;
-						
-						// Convert rotation to forward vector.
-						var forward = new Vector3(MathF.Sin(rot), 0, MathF.Cos(rot));
-						
-						// Apply transform to forward vector.
-						forward = Vector3.Transform(forward, transform);
-						
-						// Extract new rotation from transformed forward vector.
-						rot = float.Atan2(forward.X, forward.Z);
-						
-						type3Data.Rotation = LimitEulerAngle(rot, radians: true);
-					}
-				
-					// Locator Type 7
-					if (locator.TypeData is LocatorChunk.Type7LocatorData type7Data)
-					{
-						var vectors = OffsetLocatorMatrixList(type7Data.Right, type7Data.Up, type7Data.Front);
-
-						type7Data.Right = vectors.right;
-						type7Data.Up = vectors.up;
-						type7Data.Front = vectors.front;
-					}
-				
-					// Locator Type 8
-					if (locator.TypeData is LocatorChunk.Type8LocatorData type8Data)
-					{
-						var vectors = OffsetLocatorMatrixList(type8Data.Right, type8Data.Up, type8Data.Front);
-
-						type8Data.Right = vectors.right;
-						type8Data.Up = vectors.up;
-						type8Data.Front = vectors.front;
-					}
-				
-					// Locator Type 12
-					if (locator.TypeData is LocatorChunk.Type12LocatorData type12Data)
-					{
-						if (type12Data.FollowPlayer == 0)
+						// Locator Type 3
+						case LocatorChunk.Type3LocatorData type3Data:
 						{
-							type12Data.TargetPosition = Vector3.Transform(type12Data.TargetPosition, transform);
+							var rot = type3Data.Rotation;
+						
+							// Convert rotation to forward vector.
+							var forward = new Vector3(MathF.Sin(rot), 0, MathF.Cos(rot));
+						
+							// Apply transform to forward vector.
+							forward = Vector3.Transform(forward, transform);
+						
+							// Extract new rotation from transformed forward vector.
+							rot = float.Atan2(forward.X, forward.Z);
+						
+							type3Data.Rotation = LimitEulerAngle(rot, radians: true);
+							break;
+						}
+						
+						// Locator Type 7
+						case LocatorChunk.Type7LocatorData type7Data:
+						{
+							var vectors = OffsetLocatorMatrixList(type7Data.Right, type7Data.Up, type7Data.Front);
+
+							type7Data.Right = vectors.right;
+							type7Data.Up = vectors.up;
+							type7Data.Front = vectors.front;
+							break;
+						}
+						
+						// Locator Type 8
+						case LocatorChunk.Type8LocatorData type8Data:
+						{
+							var vectors = OffsetLocatorMatrixList(type8Data.Right, type8Data.Up, type8Data.Front);
+
+							type8Data.Right = vectors.right;
+							type8Data.Up = vectors.up;
+							type8Data.Front = vectors.front;
+							break;
+						}
+						
+						// Locator Type 12
+						case LocatorChunk.Type12LocatorData type12Data:
+						{
+							if (type12Data.FollowPlayer == 0)
+							{
+								type12Data.TargetPosition = Vector3.Transform(type12Data.TargetPosition, transform);
+							}
+
+							break;
 						}
 					}
 
