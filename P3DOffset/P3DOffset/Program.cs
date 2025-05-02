@@ -69,18 +69,6 @@ static class Program {
 					break;
 			}
 		}
-		
-		// Convert input euler angles to rotation matrix.
-		var rotMtrx = GetRotationMatrix(rotation.X * deg2Rad, rotation.Y * deg2Rad, rotation.Z * deg2Rad);
-		
-		// Convert rotation matrix to quaternion.
-		rotQuat = Quaternion.CreateFromRotationMatrix(rotMtrx);
-		
-		// Convert input translation to translation matrix.
-		var transMtrx = Matrix4x4.CreateTranslation(translation);
-		
-		// Combine rotation matrix and translation matrix into transformation matrix.
-		transform = rotMtrx * transMtrx;
 
 		// Check input and output files have been specified.
 		if (string.IsNullOrEmpty(inputPath))
@@ -95,14 +83,14 @@ static class Program {
 			Environment.Exit(4);
 		}
 
-		// Check input file exists.
+		// Make sure input file exists.
 		if (!File.Exists(inputPath))
 		{
 			Console.WriteLine("Error: Input file does not exist.");
 			Environment.Exit(5);
 		}
 		
-		// Check if output file already exists.
+		// Make sure output file doesn't already exist.
 		if (!forceOverwrite && File.Exists(outputPath))
 		{
 			Console.WriteLine($"Output file \"{outputPath}\" already exists.");
@@ -114,6 +102,25 @@ static class Program {
 				Environment.Exit(7);
 			}
 		}
+		
+		// Make sure that a translation/rotation is actually being applied.  
+		if (translation == Vector3.Zero && rotation == Vector3.Zero)
+		{
+			Console.WriteLine("Error: Translation and rotation are both 0.");
+			Environment.Exit(8);
+		}
+		
+		// Convert input euler angles to rotation matrix.
+		var rotMtrx = GetRotationMatrix(rotation.X * deg2Rad, rotation.Y * deg2Rad, rotation.Z * deg2Rad);
+		
+		// Convert rotation matrix to quaternion.
+		rotQuat = Quaternion.CreateFromRotationMatrix(rotMtrx);
+		
+		// Convert input translation to translation matrix.
+		var transMtrx = Matrix4x4.CreateTranslation(translation);
+		
+		// Combine rotation matrix and translation matrix into transformation matrix.
+		transform = rotMtrx * transMtrx;
 
 		// Create P3DFile Object
 		Console.WriteLine($"Reading file \"{inputPath}\"...");
@@ -129,6 +136,7 @@ static class Program {
 
 		// Offset Chunks
 		Console.WriteLine("Applying offsets...");
+		
 		foreach (var chunk in p3dFile.Chunks)
 		{
 			switch (chunk)
