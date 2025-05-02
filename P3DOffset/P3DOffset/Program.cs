@@ -772,10 +772,10 @@ static class Program {
 			}
 
 			// Find animation chunk referenced by the frame controller.
-			// If hierarchy parent is null find in file, else find in parent.
-			var animation = parent is null
+			// If hierarchy parent is null find in file, else find in hierarchy parent.
+			var animation = hierarchyParent is null
 				? p3dFile.GetFirstChunkOfType<AnimationChunk>(controller.AnimationName)
-				: parent.GetFirstChunkOfType<AnimationChunk>(controller.AnimationName);
+				: hierarchyParent.GetFirstChunkOfType<AnimationChunk>(controller.AnimationName);
 
 			if (animation == null)
 			{
