@@ -13,6 +13,7 @@ static class Program {
 	
 	static Vector3 translation = new(0, 0, 0);
 	static Vector3 rotation = new(0, 0, 0);
+	static Matrix4x4 rotMtrx;
 	static Matrix4x4 transform;
 	static Quaternion rotQuat;
 	
@@ -111,7 +112,7 @@ static class Program {
 		}
 		
 		// Convert input euler angles to rotation matrix.
-		var rotMtrx = GetRotationMatrix(rotation.X * deg2Rad, rotation.Y * deg2Rad, rotation.Z * deg2Rad);
+		rotMtrx = GetRotationMatrix(rotation.X * deg2Rad, rotation.Y * deg2Rad, rotation.Z * deg2Rad);
 		
 		// Convert rotation matrix to quaternion.
 		rotQuat = Quaternion.CreateFromRotationMatrix(rotMtrx);
@@ -379,14 +380,14 @@ static class Program {
 				{
 					foreach (var drawable in chunk.GetChunksOfType<CompositeDrawableChunk>())
 					{
-						OffsetDrawable(drawable, hierarchyParent: chunk, parent: chunk);
+						OffsetDrawable(drawable, hierarchyParent: chunk, parent: chunk, translate: false);
 					}
 
 					foreach (var lensFlare in chunk.GetChunksOfType<LensFlareChunk>())
 					{
 						foreach (var drawable in lensFlare.GetChunksOfType<CompositeDrawableChunk>())
 						{
-							OffsetDrawable(drawable, hierarchyParent: chunk, parent: lensFlare);
+							OffsetDrawable(drawable, hierarchyParent: chunk, parent: lensFlare, translate: false);
 						}
 					}
 					break;
@@ -416,12 +417,12 @@ static class Program {
 				
 				foreach (var position in light.GetChunksOfType<LightPositionChunk>())
 				{
-					position.Position = Vector3.Transform(position.Position, transform);
+					position.Position = Vector3.Transform(position.Position, rotMtrx);
 				}
 
 				foreach (var direction in light.GetChunksOfType<LightDirectionChunk>())
 				{
-					direction.Direction = Vector3.Transform(direction.Direction, transform);
+					direction.Direction = Vector3.Transform(direction.Direction, rotMtrx);
 				}
 			}
 		}
@@ -560,7 +561,7 @@ static class Program {
 
 	// Offset Chunk Methods //
 	// Composite Drawable (0x4512)
-	static void OffsetDrawable(CompositeDrawableChunk drawable, Chunk? hierarchyParent = null, Chunk? parent = null)
+	static void OffsetDrawable(CompositeDrawableChunk drawable, Chunk? hierarchyParent = null, Chunk? parent = null, bool translate = true)
 	{
 		// Find skin chunks used by the Composite Drawable.
 		foreach (var skinList in drawable.GetChunksOfType<CompositeDrawableSkinListChunk>())
@@ -577,7 +578,7 @@ static class Program {
 				{
 					continue;
 				}
-				OffsetMeshOrSkin(skin);
+				OffsetMeshOrSkin(skin, translate);
 			}
 		}
 		
@@ -599,13 +600,14 @@ static class Program {
 			return;
 		}
 		
-		rootJoint.RestPose *= transform;
+		// If translate is true root joint will be translated & rotated, otherwise it will just be rotated.
+		rootJoint.RestPose *= translate ? transform : rotMtrx;
 		
-		OffsetAnimation(skeleton.Name, rootJoint.Name, hierarchyParent, parent);
+		OffsetAnimation(skeleton.Name, rootJoint.Name, hierarchyParent, parent, translate);
 	}
 	
 	// Mesh (0x10000) & Skin (0x10001)
-	static void OffsetMeshOrSkin(Chunk mesh)
+	static void OffsetMeshOrSkin(Chunk mesh, bool translate = true)
 	{
 		float? lowX = null, lowY = null, lowZ = null;
 		float? highX = null, highY = null, highZ = null;
@@ -622,12 +624,12 @@ static class Program {
 			{
 				// Apply transform to each vertex position.
 				var pos = positionList.Positions[i];
-				var newPos = Vector3.Transform(pos, transform);
+				// If translate is true mesh will be translated & rotated, otherwise it will just be rotated.
+				var newPos = Vector3.Transform(pos, translate ? transform : rotMtrx);
 				positionList.Positions[i] = newPos;
 
 				// Find min and max X, Y and Z values.
-				lowX = Math.Min(lowX ?? newPos.X,
-					newPos.X); // If lowX is null, newPos.X is substituted in instead.
+				lowX = Math.Min(lowX ?? newPos.X, newPos.X); // If lowX is null, newPos.X is substituted in instead.
 				lowY = Math.Min(lowY ?? newPos.Y, newPos.Y);
 				lowZ = Math.Min(lowZ ?? newPos.Z, newPos.Z);
 
@@ -754,7 +756,7 @@ static class Program {
 	}
 	
 	// Animation (0x121000)
-	static void OffsetAnimation(string hierarchyName, string? rootJointName = null, Chunk? hierarchyParent = null, Chunk? parent = null)
+	static void OffsetAnimation(string hierarchyName, string? rootJointName = null, Chunk? hierarchyParent = null, Chunk? parent = null, bool translate = true)
 	{
 		// Find all Old Frame Controllers in parent chunk. If parent is null, find in file instead.
 		var controllers = parent is null
@@ -845,7 +847,8 @@ static class Program {
 
 						for (int i = 0; i < vector.Values.Count; i++)
 						{
-							vector.Values[i] = Vector3.Transform(vector.Values[i], transform);
+							// If translate is true vector will be translated & rotated, otherwise it will just be rotated.
+							vector.Values[i] = Vector3.Transform(vector.Values[i], translate ? transform : rotMtrx);
 						}
 					}
 
