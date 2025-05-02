@@ -50,22 +50,22 @@ static class Program {
 					forceOverwrite = true;
 					break;
 				case "-x":
-					translation.X = float.Parse(GetArgValue(args, i));
+					translation.X = ParseFloat(GetArgValue(args, i));
 					break;
 				case "-y":
-					translation.Y = float.Parse(GetArgValue(args, i));
+					translation.Y = ParseFloat(GetArgValue(args, i));
 					break;
 				case "-z":
-					translation.Z = float.Parse(GetArgValue(args, i));
+					translation.Z = ParseFloat(GetArgValue(args, i));
 					break;
 				case "-rx":
-					rotation.X = LimitEulerAngle(float.Parse(GetArgValue(args, i)));
+					rotation.X = LimitEulerAngle(ParseFloat(GetArgValue(args, i)));
 					break;
 				case "-ry":
-					rotation.Y = LimitEulerAngle(float.Parse(GetArgValue(args, i)));
+					rotation.Y = LimitEulerAngle(ParseFloat(GetArgValue(args, i)));
 					break;
 				case "-rz":
-					rotation.Z = LimitEulerAngle(float.Parse(GetArgValue(args, i)));
+					rotation.Z = LimitEulerAngle(ParseFloat(GetArgValue(args, i)));
 					break;
 			}
 		}
@@ -86,20 +86,20 @@ static class Program {
 		if (string.IsNullOrEmpty(inputPath))
 		{
 			Console.WriteLine("Error: No input file specified.");
-			Environment.Exit(3);
+			Environment.Exit(4);
 		}
 
 		if (string.IsNullOrEmpty(outputPath))
 		{
 			Console.WriteLine("Error: No output file specified.");
-			Environment.Exit(3);
+			Environment.Exit(4);
 		}
 
 		// Check input file exists.
 		if (File.Exists(inputPath) == false)
 		{
 			Console.WriteLine("Error: Input file does not exist.");
-			Environment.Exit(4);
+			Environment.Exit(5);
 		}
 
 		// Create P3DFile Object
@@ -408,7 +408,7 @@ static class Program {
 			if (response != null && response.ToLower()[0] != 'y')
 			{
 				Console.WriteLine("Error: File could not be written.");
-				Environment.Exit(5);
+				Environment.Exit(6);
 			}
 		}
 
@@ -450,6 +450,18 @@ static class Program {
 			Environment.Exit(2);
 		}
 		return args[i + 1];
+	}
+	
+	// Parse float from string with error handling.
+	static float ParseFloat(string input)
+	{
+		if (!float.TryParse(input, out var output))
+		{
+			Console.WriteLine($"Error: \"{input}\" is not a valid float.");
+			Environment.Exit(3);
+		}
+
+		return output;
 	}
 
 	// Limit the inputted euler angle between -179 and 180 degrees.
