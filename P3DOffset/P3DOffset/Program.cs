@@ -96,17 +96,39 @@ static class Program {
 		}
 
 		// Check input file exists.
-		if (File.Exists(inputPath) == false)
+		if (!File.Exists(inputPath))
 		{
 			Console.WriteLine("Error: Input file does not exist.");
 			Environment.Exit(5);
 		}
+		
+		// Check if output file already exists.
+		if (!forceOverwrite && File.Exists(outputPath))
+		{
+			Console.WriteLine($"Output file \"{outputPath}\" already exists.");
+			Console.WriteLine("Do you want to overwrite? (Y/N): ");
+			var response = Console.ReadLine();
+			if (response != null && response.ToLower()[0] != 'y')
+			{
+				Console.WriteLine("Error: Could not write output file. File already exists.");
+				Environment.Exit(7);
+			}
+		}
 
 		// Create P3DFile Object
-		Console.WriteLine($"Reading {inputPath}...");
-		p3dFile = new P3DFile(inputPath);
+		Console.WriteLine($"Reading file \"{inputPath}\"...");
+		try
+		{
+			p3dFile = new P3DFile(inputPath);
+		}
+		catch (Exception e)
+		{
+			Console.WriteLine("Error: Could not read input file. " + e.Message);
+			Environment.Exit(6);
+		}
 
 		// Offset Chunks
+		Console.WriteLine("Applying offsets...");
 		foreach (var chunk in p3dFile.Chunks)
 		{
 			switch (chunk)
@@ -398,22 +420,19 @@ static class Program {
 			
 			OffsetDrawable(drawable);
 		}
-		
-		// Check if output file already exists.
-		if (!forceOverwrite && File.Exists(outputPath))
-		{
-			Console.WriteLine($"Output file \"{outputPath}\" already exists.");
-			Console.WriteLine("Do you want to overwrite? (Y/N): ");
-			var response = Console.ReadLine();
-			if (response != null && response.ToLower()[0] != 'y')
-			{
-				Console.WriteLine("Error: File could not be written.");
-				Environment.Exit(6);
-			}
-		}
 
 		// Write output file.
-		p3dFile.Write(outputPath);
+		Console.WriteLine($"Writing file \"{outputPath}\"...");
+		try
+		{
+			p3dFile.Write(outputPath);
+		}
+		catch (Exception e)
+		{
+			Console.WriteLine("Error: Could not write output file. " + e.Message);
+			Environment.Exit(7);
+		}
+		
 		Console.WriteLine("Successfully wrote file!");
 		Environment.Exit(0);
 	}
