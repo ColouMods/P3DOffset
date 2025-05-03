@@ -146,8 +146,8 @@ static class Program {
 				case CameraChunk camera:
 				{
 					camera.Position = Vector3.Transform(camera.Position, transform);
-					camera.Look = Vector3.Transform(camera.Look, transform);
-					camera.Up = Vector3.Transform(camera.Up, transform);
+					camera.Look = Vector3.Transform(camera.Look, rotMtrx);
+					camera.Up = Vector3.Transform(camera.Up, rotMtrx);
 					
 					OffsetAnimation(camera.Name);
 					break;
@@ -853,8 +853,14 @@ static class Program {
 
 						for (int i = 0; i < vector.Values.Count; i++)
 						{
-							// If translate is true vector will be translated & rotated, otherwise it will just be rotated.
-							vector.Values[i] = Vector3.Transform(vector.Values[i], translate ? transform : rotMtrx);
+							if (translate && vector.Param == "TRAN")
+							{
+								vector.Values[i] = Vector3.Transform(vector.Values[i], transform);
+							}
+							else
+							{
+								vector.Values[i] = Vector3.Transform(vector.Values[i], rotMtrx);
+							}
 						}
 					}
 
@@ -896,6 +902,8 @@ static class Program {
 				while ((size = animation.GetFirstChunkOfType<AnimationSizeChunk>()) != null)
 				{
 					animation.Children.Remove(size);
+				}
+			}
 		}
 	}
 	
