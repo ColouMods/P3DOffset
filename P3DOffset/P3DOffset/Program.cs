@@ -680,6 +680,17 @@ static class Program {
 
 			boundingSphere.Radius = maxDist ?? 0;
 		}
+
+		foreach (var offsetGroup in mesh.GetChunksOfType<OldExpressionOffsetsChunk>())
+		{
+			foreach (var offsetList in offsetGroup.GetChunksOfType<OldOffsetListChunk>())
+			{
+				foreach (var offset in offsetList.Offsets)
+				{
+					offset.Offset = Vector3.Transform(offset.Offset, translate ? transform : rotMtrx);
+				}
+			}
+		}
 	}
 	
 	// Old Scenegraph Transform (0x120103) & Old Scenegraph Drawable (0x120107)
