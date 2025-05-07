@@ -95,7 +95,7 @@ static class Program {
 		if (!forceOverwrite && File.Exists(outputPath))
 		{
 			Console.WriteLine($"Output file \"{outputPath}\" already exists.");
-			Console.WriteLine("Do you want to overwrite? (Y/N): ");
+			Console.Write("Do you want to overwrite? (Y/N): ");
 			var response = Console.ReadLine();
 			if (response != null && response.ToLower()[0] != 'y')
 			{
