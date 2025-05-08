@@ -13,6 +13,7 @@ static class Program {
 	
 	static Vector3 translation = new(0, 0, 0);
 	static Vector3 rotation = new(0, 0, 0);
+	static char[] order = ['z', 'y', 'x'];
 	static Matrix4x4 rotMtrx;
 	static Matrix4x4 transform;
 	static Quaternion rotQuat;
@@ -67,6 +68,19 @@ static class Program {
 					break;
 				case "-rz":
 					rotation.Z = LimitEulerAngle(ParseFloat(GetArgValue(args, i)));
+					break;
+				case "-ro" or "--order":
+					var orderString = GetArgValue(args, i);
+					order = orderString.ToLower().ToCharArray();
+					
+					// Make sure order contains only X, Y, & Z
+					var orderSorted = (char[]) order.Clone();
+					Array.Sort(orderSorted);
+					if (orderSorted is not ['x', 'y', 'z'])
+					{
+						Console.WriteLine($"Error: \"{orderString}\" is not a valid rotation order.");
+						Environment.Exit(3);
+					}
 					break;
 			}
 		}
@@ -467,9 +481,10 @@ static class Program {
 		Console.WriteLine("    -x              Set X position offset.");
 		Console.WriteLine("    -y              Set Y position offset.");
 		Console.WriteLine("    -z              Set Z position offset.");
-		Console.WriteLine("    -rx             Set X rotation offset.");
-		Console.WriteLine("    -ry             Set Y rotation offset.");
-		Console.WriteLine("    -rz             Set Z rotation offset.");
+		Console.WriteLine("    -rx             Set X rotation offset in degrees.");
+		Console.WriteLine("    -ry             Set Y rotation offset in degrees.");
+		Console.WriteLine("    -rz             Set Z rotation offset in degrees.");
+		Console.WriteLine("    -ro, --order    Set order of rotations. Defaults to 'ZYX'");
 		Console.WriteLine();
 		Console.WriteLine("Example:");
 		Console.WriteLine("    P3DOffset -i C:\\input\\file.p3d -o C:\\output\\file.p3d -x 100 -z 50");
@@ -514,28 +529,33 @@ static class Program {
 	// Calculate rotation matrix based on euler angles.
 	static Matrix4x4 GetRotationMatrix(float x, float y, float z)
 	{
-		var xMtrx = new Matrix4x4(
-			1f, 0f, 0f, 0f,
-			0f, MathF.Cos(x), MathF.Sin(x), 0f,
-			0f, -MathF.Sin(x), MathF.Cos(x), 0f,
-			0f, 0f, 0f, 1f
-		);
-    
-		var yMtrx = new Matrix4x4(
-			MathF.Cos(y), 0f, -MathF.Sin(y), 0f,
-			0f, 1f, 0f, 0f,
-			MathF.Sin(y), 0f, MathF.Cos(y), 0f,
-			0f, 0f, 0f, 1f
-		);
-    
-		var zMtrx = new Matrix4x4(
-			MathF.Cos(z), MathF.Sin(z), 0f, 0f,
-			-MathF.Sin(z), MathF.Cos(z), 0f, 0f,
-			0f, 0f, 1f, 0f,
-			0f, 0f, 0f, 1f
-		);
-		
-		return zMtrx * yMtrx * xMtrx;
+		var matrices = new Dictionary<char, Matrix4x4>
+		{
+			{
+				'x', new Matrix4x4(
+					1f, 0f, 0f, 0f,
+					0f, MathF.Cos(x), MathF.Sin(x), 0f,
+					0f, -MathF.Sin(x), MathF.Cos(x), 0f,
+					0f, 0f, 0f, 1f)
+			},
+			{
+				'y', new Matrix4x4(
+					MathF.Cos(y), 0f, -MathF.Sin(y), 0f,
+					0f, 1f, 0f, 0f,
+					MathF.Sin(y), 0f, MathF.Cos(y), 0f,
+					0f, 0f, 0f, 1f)
+			},
+			{
+				'z', new Matrix4x4(
+					MathF.Cos(z), MathF.Sin(z), 0f, 0f,
+					-MathF.Sin(z), MathF.Cos(z), 0f, 0f,
+					0f, 0f, 1f, 0f,
+					0f, 0f, 0f, 1f)
+			}
+		};
+
+		// Return matrix multiplied in order of rotation order.
+		return matrices[order[0]] * matrices[order[1]] * matrices[order[2]];
 	}
 	
 	// Calculate fence normal from start and end point.
@@ -925,8 +945,7 @@ static class Program {
 			right.X, right.Y, right.Z, 0,
 			up.X, up.Y, up.Z, 0,
 			front.X, front.Y, front.Z, 0,
-			0, 0, 0, 1
-		);
+			0, 0, 0, 1);
 
 		matrix *= transform;
 		
