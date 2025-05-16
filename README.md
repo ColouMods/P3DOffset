@@ -75,6 +75,6 @@ Compiled builds for Windows and Linux can be found on the [Releases page](https:
 
 ## Important notes
 
-- Currently, this tool does not support offsetting `Intsersect` collision chunks due to their relative complexity compared to other chunk types. Each `Instersect` chunk need to be aligned with the bounds of the game's [k-d Tree](https://en.wikipedia.org/wiki/K-d_tree) and so they cannot be simply offset - every chunk needs to be re-generated from scratch. This may be supported in future, but for the moment I recommend using the Pure3D editor's 'Export All Intersect' and 'Import All Intersect' functions to offset the collision manually.
+- Currently, this tool does not support offsetting `Intersect` collision chunks due to their relative complexity compared to other chunk types. Each `Intersect` chunk need to be aligned with the bounds of the game's [k-d Tree](https://en.wikipedia.org/wiki/K-d_tree) and so they cannot be simply offset - every chunk needs to be re-generated from scratch. This may be supported in future, but for the moment I recommend using the Pure3D editor's 'Export All Intersect' and 'Import All Intersect' functions to offset the collision manually.
 
 - This tool, like the game, uses a left-handed coordinate system with Y as the up axis. This is different from many 3D modelling programs (such as Blender) which use a right-handed coordinate system with Z as the up axis. As such, you may need to swap around translation or rotation values if you are taking them from these programs.
