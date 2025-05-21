@@ -238,22 +238,18 @@ static class Program {
 						// Locator Type 7
 						case LocatorChunk.Type7LocatorData type7Data:
 						{
-							var (right, up, front) = OffsetLocatorMatrixList(type7Data.Right, type7Data.Up, type7Data.Front);
-
-							type7Data.Right = right;
-							type7Data.Up = up;
-							type7Data.Front = front;
+							type7Data.Right = Vector3.Transform(type7Data.Right, rotMtrx);
+							type7Data.Up = Vector3.Transform(type7Data.Up, rotMtrx);
+							type7Data.Front = Vector3.Transform(type7Data.Front, rotMtrx);
 							break;
 						}
 						
 						// Locator Type 8
 						case LocatorChunk.Type8LocatorData type8Data:
 						{
-							var (right, up, front) = OffsetLocatorMatrixList(type8Data.Right, type8Data.Up, type8Data.Front);
-
-							type8Data.Right = right;
-							type8Data.Up = up;
-							type8Data.Front = front;
+							type8Data.Right = Vector3.Transform(type8Data.Right, rotMtrx);
+							type8Data.Up = Vector3.Transform(type8Data.Up, rotMtrx);
+							type8Data.Front = Vector3.Transform(type8Data.Front, rotMtrx);
 							break;
 						}
 						
@@ -938,24 +934,6 @@ static class Program {
 		}
 	}
 	
-	// Locator (0x3000005) Type 7 & 8
-	static (Vector3 right, Vector3 up, Vector3 front) OffsetLocatorMatrixList(Vector3 right, Vector3 up, Vector3 front)
-	{
-		var matrix = new Matrix4x4(
-			right.X, right.Y, right.Z, 0,
-			up.X, up.Y, up.Z, 0,
-			front.X, front.Y, front.Z, 0,
-			0, 0, 0, 1);
-
-		matrix *= transform;
-		
-		var newRight = new Vector3(matrix.M11, matrix.M12, matrix.M13);
-		var newUp = new Vector3(matrix.M21, matrix.M22, matrix.M23);
-		var newFront = new Vector3(matrix.M31, matrix.M32, matrix.M33);
-
-		return (newRight, newUp, newFront);
-	}
-	
 	// Collision Volume (0x7010001)
 	static void OffsetCollisionVolumes(Chunk chunk)
 	{
@@ -972,20 +950,14 @@ static class Program {
 					continue;
 				}
 				
-				// Construct matrix from vectors.
-				var boxRot = new Matrix4x4(vectors[1].Vector.X, vectors[1].Vector.Y, vectors[1].Vector.Z, 0,
-					vectors[2].Vector.X, vectors[2].Vector.Y, vectors[2].Vector.Z, 0,
-					vectors[3].Vector.X, vectors[3].Vector.Y, vectors[3].Vector.Z, 0,
-					vectors[0].Vector.X, vectors[0].Vector.Y, vectors[0].Vector.Z, 1);
-					
-				// Apply transform to matrix.
-				var newBoxRot = boxRot * transform;
-					
-				// Convert matrix back to vectors.
-				vectors[0].Vector = new Vector3(newBoxRot.M41, newBoxRot.M42, newBoxRot.M43);
-				vectors[1].Vector = new Vector3(newBoxRot.M11, newBoxRot.M12, newBoxRot.M13);
-				vectors[2].Vector = new Vector3(newBoxRot.M21, newBoxRot.M22, newBoxRot.M23);
-				vectors[3].Vector = new Vector3(newBoxRot.M31, newBoxRot.M32, newBoxRot.M33);
+				// Apply transform to centre vector.
+				vectors[0].Vector = Vector3.Transform(vectors[0].Vector, transform);
+
+				// Apply rotation matrix to direction vectors.
+				for (int i = 1; i < vectors.Length; i++)
+				{
+					vectors[i].Vector = Vector3.Transform(vectors[i].Vector, rotMtrx);
+				}
 			}
 
 			foreach (var collisionCylinder in collisionVolume.GetChunksOfType<CollisionCylinderChunk>())
