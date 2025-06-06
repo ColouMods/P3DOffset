@@ -225,8 +225,8 @@ static class Program {
 							// Convert rotation to forward vector.
 							var forward = new Vector3(MathF.Sin(rot), 0, MathF.Cos(rot));
 						
-							// Apply transform to forward vector.
-							forward = Vector3.Transform(forward, transform);
+							// Apply rotation matrix to forward vector.
+							forward = Vector3.Transform(forward, rotMtrx);
 						
 							// Extract new rotation from transformed forward vector.
 							rot = float.Atan2(forward.X, forward.Z);
