@@ -964,24 +964,16 @@ static class Program {
 			{
 				var vectors = collisionCylinder.GetChunksOfType<CollisionVectorChunk>();
 				
-				if (vectors.Length != 2)
+				if (vectors.Length < 2)
 				{
 					continue;
 				}
 				
 				// Apply transform to centre vector.
 				vectors[0].Vector = Vector3.Transform(vectors[0].Vector, transform);
-
-				// Apply transform to direction vector.
-				var rot = vectors[1].Vector;
-				// Collision Cylinders don't store the entire rotation matrix, they store only the centre column as a vector.
-				// As such, applying the transform isn't as simple as multiplying matrices.
-				// But, by complete accident, I stumbled upon a formula that seems to work? (though I don't understand why)
-				vectors[1].Vector = new Vector3(
-					transform.M11 * rot.X + transform.M21 * rot.Y + transform.M31 * rot.Z,
-					transform.M12 * rot.X + transform.M22 * rot.Y + transform.M32 * rot.Z,
-					transform.M13 * rot.X + transform.M23 * rot.Y + transform.M33 * rot.Z
-				);
+				
+				// Apply rotation matrix to direction vector.
+				vectors[1].Vector = Vector3.Transform(vectors[1].Vector, rotMtrx);
 			}
 
 			foreach (var collisionSphere in collisionVolume.GetChunksOfType<CollisionSphereChunk>())
