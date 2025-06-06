@@ -945,7 +945,7 @@ static class Program {
 			{
 				var vectors = collisionBox.GetChunksOfType<CollisionVectorChunk>();
 			
-				if (vectors.Length != 4)
+				if (vectors.Length < 2)
 				{
 					continue;
 				}
