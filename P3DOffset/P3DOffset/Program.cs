@@ -653,6 +653,20 @@ static class Program {
 				highY = Math.Max(highY ?? newPos.Y, newPos.Y);
 				highZ = Math.Max(highZ ?? newPos.Z, newPos.Z);
 			}
+			
+			var normalList = primitiveGroup.GetFirstChunkOfType<NormalListChunk>();
+			if (normalList == null)
+			{
+				continue;
+			}
+
+			for (int i = 0; i < normalList.Normals.Count; i++)
+			{
+				// Apply rotation matrix to each normal vector.
+				var normal = normalList.Normals[i];
+				var newNormal = Vector3.Transform(normal, rotMtrx);
+				normalList.Normals[i] = newNormal;
+			}
 		}
 
 		// Set Bounding Box values.
