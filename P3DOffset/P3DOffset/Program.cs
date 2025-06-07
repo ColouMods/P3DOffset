@@ -32,6 +32,8 @@ static class Program {
 			PrintHelp();
 			Environment.Exit(1);
 		}
+
+		var blender = false;
 		
 		// Get variable values from command line arguments.
 		for (int i = 0; i < args.Length; i++)
@@ -82,6 +84,10 @@ static class Program {
 						Environment.Exit(3);
 					}
 					break;
+				case "-b" or "--blender":
+					order = ['x', 'z', 'y'];
+					blender = true;
+					break;
 			}
 		}
 
@@ -123,6 +129,13 @@ static class Program {
 		{
 			Console.WriteLine("Error: Translation and rotation are both 0.");
 			Environment.Exit(8);
+		}
+		
+		// If input values are in Blender format, swap X and Z and invert euler angles.
+		if (blender)
+		{
+			translation = new Vector3(translation.X, translation.Z, translation.Y);
+			rotation = new Vector3(-rotation.X, -rotation.Z, -rotation.Y);
 		}
 		
 		// Convert input euler angles to rotation matrix.
@@ -470,17 +483,18 @@ static class Program {
 		Console.WriteLine("Usage: P3DOffset [options]");
 		Console.WriteLine();
 		Console.WriteLine("Options:");
-		Console.WriteLine("    -h, --help      Display help message.");
-		Console.WriteLine("    -i, --input     Set path to the input file. Required.");
-		Console.WriteLine("    -o, --output    Set path to the output file. Required.");
-		Console.WriteLine("    -f, --force     Force overwrite the output file.");
-		Console.WriteLine("    -x              Set X position offset.");
-		Console.WriteLine("    -y              Set Y position offset.");
-		Console.WriteLine("    -z              Set Z position offset.");
-		Console.WriteLine("    -rx             Set X rotation offset in degrees.");
-		Console.WriteLine("    -ry             Set Y rotation offset in degrees.");
-		Console.WriteLine("    -rz             Set Z rotation offset in degrees.");
-		Console.WriteLine("    -ro, --order    Set order of rotations. Defaults to 'ZYX'");
+		Console.WriteLine("    -h, --help       Display help message.");
+		Console.WriteLine("    -i, --input      Set path to the input file. Required.");
+		Console.WriteLine("    -o, --output     Set path to the output file. Required.");
+		Console.WriteLine("    -f, --force      Force overwrite the output file.");
+		Console.WriteLine("    -x               Set X position offset.");
+		Console.WriteLine("    -y               Set Y position offset.");
+		Console.WriteLine("    -z               Set Z position offset.");
+		Console.WriteLine("    -rx              Set X rotation offset in degrees.");
+		Console.WriteLine("    -ry              Set Y rotation offset in degrees.");
+		Console.WriteLine("    -rz              Set Z rotation offset in degrees.");
+		Console.WriteLine("    -ro, --order     Set order of rotations. Defaults to 'ZYX'");
+		Console.WriteLine("    -b, --blender    Shortcut for using Blender's position/rotation format.");
 		Console.WriteLine();
 		Console.WriteLine("Example:");
 		Console.WriteLine("    P3DOffset -i C:\\input\\file.p3d -o C:\\output\\file.p3d -x 100 -z 50");
