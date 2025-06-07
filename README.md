@@ -71,6 +71,10 @@ Compiled builds for Windows and Linux can be found on the [Releases page](https:
 		<td><b>-ro, --order</b></td>
 		<td>Set order of rotations. Defaults to 'ZYX'</td>
 	</tr>
+	<tr>
+		<td><b>-b, --blender</b></td>
+		<td>Shortcut for using Blender's position/rotation format.</td>
+	</tr>
 </table> 
 
 ## Important notes
@@ -78,3 +82,4 @@ Compiled builds for Windows and Linux can be found on the [Releases page](https:
 - Currently, this tool does not support offsetting `Intersect` collision chunks due to their relative complexity compared to other chunk types. Each `Intersect` chunk need to be aligned with the bounds of the game's [k-d Tree](https://en.wikipedia.org/wiki/K-d_tree) and so they cannot be simply offset - every chunk needs to be re-generated from scratch. This may be supported in future, but for the moment I recommend using the Pure3D editor's 'Export All Intersect' and 'Import All Intersect' functions to offset the collision manually.
 
 - This tool, like the game, uses a left-handed coordinate system with Y as the up axis. This is different from many 3D modelling programs (such as Blender) which use a right-handed coordinate system with Z as the up axis. As such, you may need to swap around translation or rotation values if you are taking them from these programs.
+	- In the case of Blender, the '-b' command line argument will take care of this automatically. This argument swaps the Y and Z axes, inverts the euler angles, and changes the rotation order to 'XZY' so that you can just grab the transformation & rotation values from Blender and put them straight into the tool.
